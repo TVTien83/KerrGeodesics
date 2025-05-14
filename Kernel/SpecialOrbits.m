@@ -8,7 +8,7 @@
 (*Define usage for public functions*)
 
 
-(* ::Section:: *)
+(* ::Section::Closed:: *)
 (*Create Package*)
 
 
@@ -42,14 +42,16 @@ KerrGeoPlungeOrbitQ::usage = "KerrGeoPlungeOrbitQ[a,p,e,x] tests if the orbital 
 
 
 KerrGeoFindResonance::noresonance = "Resonant orbits only occur for semi-latus rectum in range `1` \[LessEqual] p \[LessEqual] `2`"
+KerrGeoFindResonance::noTripleResonance = "Triple Resonant orbits occur for `1` \[LessEqual] r-integer \[LessEqual] `2`, `3` \[LessEqual] \[Theta]-integer \[LessEqual] `4` or `5` \[LessEqual] \[Phi]-integer \[LessEqual] `6`"
 KerrGeoFindResonance::invalida = "Invalid black hole spin parameter. Choose 0 < a \[LessEqual] 1."
 KerrGeoFindResonance::invalide = "Invalid orbital eccentricity. Choose 0 \[LessEqual] e \[LessEqual] 1."
 KerrGeoFindResonance::invalidx = "Invalid orbital inclination. Choose 0 \[LessEqual] |x| \[LessEqual] 1."
-KerrGeoFindResonance::invalidratio = "Invalid resonant integers. Choose \[Beta]r > \[Beta]\[Theta] > 0, \[Beta]r > \[Beta]\[Phi] > 0."
-KerrGeoFindResonance::assocErr = "Association should have 3 keys including both {a,x} and one of {p,e}"
+KerrGeoFindResonance::invalidRatio = "Invalid resonant integers. Choose |\[Beta]r| > |\[Beta]\[Theta]|, |\[Beta]r| > |\[Beta]\[Phi]| and \[Beta]\[Theta]*\[Beta]\[Phi] > 0."
+KerrGeoFindResonance::assocErr = "Association should have 3 keys including both a and two of {p, e, x}"
+KerrGeoFindResonance::assocErrTriple = "Only support association {a, e} for input"
 KerrGeoFindResonance::missing = "Resonaces involving the \[Phi] frequency are not yet implemented"
-KerrGeoFindResonance::prograde = "The solution is prograde: `1`"
-KerrGeoFindResonance::retrograde = "The solution is retrograde: `1`"
+KerrGeoFindResonance::invalidPrograde = "Invalid prograde resonant integers. Choose \[Beta]r/\[Beta]\[Phi] > 0, \[Beta]r/\[Beta]\[Phi] > 0 and \[Beta]\[Theta] < \[Beta]\[Phi]"
+KerrGeoFindResonance::invalidRetrograde = "Invalid retrograde resonant integers. Choose \[Beta]r/\[Beta]\[Phi] < 0, \[Beta]r/\[Beta]\[Phi] < 0 and \[Beta]\[Theta] > \[Beta]\[Phi]"  
 
 
 (* ::Subsection::Closed:: *)
@@ -351,7 +353,7 @@ KerrGeoOrbitType[a_?NumericQ, p_?NumericQ, e_?NumericQ, x_?NumericQ]:=Module[{ou
 (*	- Root finding methods are based on those described in Sec.  VE*)
 
 
-(* ::Subsubsection:: *)
+(* ::Subsubsection::Closed:: *)
 (*Testing functions*)
 
 
@@ -373,13 +375,27 @@ ValidXQ[x_]:=Module[{xFlag=True},
 ];
 
 
-ValidResIntQ[\[Beta]r_,\[Beta]th_]:=Module[{resFlag},
-	If[!(\[Beta]th>\[Beta]r>0), Message[KerrGeoFindResonance::invalidratio]; resFlag=False];
+ValidResIntQ[\[Beta]r_/;\[Beta]r!=0,\[Beta]\[Theta]_/;\[Beta]\[Theta]!=0,\[Beta]\[Phi]_/;\[Beta]\[Phi]!=0]:=Module[{resFlag},
+	If[(Abs[\[Beta]r]>Abs[\[Beta]\[Theta]]), Message[KerrGeoFindResonance::invalidRatio]; resFlag=False];
+	If[(Abs[\[Beta]r]>Abs[\[Beta]\[Phi]]), Message[KerrGeoFindResonance::invalidRatio]; resFlag=False];
+	If[(\[Beta]\[Theta] \[Beta]\[Phi]<0), Message[KerrGeoFindResonance::invalidRatio]; resFlag=False];
+	resFlag
+];
+ValidResIntQ[\[Beta]r_/;\[Beta]r!=0,\[Beta]\[Theta]_/;\[Beta]\[Theta]!=0,0]:=Module[{resFlag},
+	If[(Abs[\[Beta]r]>Abs[\[Beta]\[Theta]]), Message[KerrGeoFindResonance::invalidRatio]; resFlag=False];
+	resFlag
+];
+ValidResIntQ[\[Beta]r_/;\[Beta]r!=0,0,\[Beta]\[Phi]_/;\[Beta]\[Phi]!=0]:=Module[{resFlag},
+	If[(Abs[\[Beta]r]>Abs[\[Beta]\[Phi]]), Message[KerrGeoFindResonance::invalidRatio]; resFlag=False];
+	resFlag
+];
+ValidResIntQ[0,\[Beta]\[Theta]_/;\[Beta]\[Theta]!=0,\[Beta]\[Phi]_/;\[Beta]\[Phi]!=0]:=Module[{resFlag},
+	If[(\[Beta]\[Theta] \[Beta]\[Phi]<0), Message[KerrGeoFindResonance::invalidRatio]; resFlag=False];
 	resFlag
 ];
 
 
-(* ::Subsubsection:: *)
+(* ::Subsubsection::Closed:: *)
 (*Useful functions for root-finding*)
 
 
@@ -437,6 +453,13 @@ y1y2[0,p_,e_,x_/;x^2<1]:=y1y2[0,p,e,1];
 Rf[0,alpha_,beta_]:=beta^(-1/2)EllipticK[1-alpha/beta];
 
 
+(* ::Text:: *)
+(*r\[Theta] ratio*)
+
+
+r\[Theta]Ratio[a_, p_, e_, x_]:=Sqrt[y1y2[a,p,e,x]]Rf[0,1+del2y2[a,p,e,x],1-del2y2[a,p,e,x]]/Rf[0,1+del1y1[a,p,e,x],1-del1y1[a,p,e,x]];
+
+
 (* ::Subsubsection::Closed:: *)
 (*Given (a,e,x) and Subscript[\[CapitalOmega], r]/Subscript[\[CapitalOmega], \[Theta]]= Subscript[\[Beta], r]/Subscript[\[Beta], \[Theta]] find p*)
 
@@ -446,23 +469,22 @@ Rf[0,alpha_,beta_]:=beta^(-1/2)EllipticK[1-alpha/beta];
 (*	Root finding methods are based on those described in Sec.  VE*)
 
 
-Options[KerrGeoOrbitRThetaResonantP]={PrecisionGoal->Automatic, Rotation->"Both"};
+Options[KerrGeoOrbitRThetaResonantP]={PrecisionGoal->Automatic};
 
 
 KerrGeoOrbitRThetaResonantP[a_?NumericQ, e_?NumericQ, x_?NumericQ, {\[Beta]r_Integer, \[Beta]\[Theta]_Integer}, opts:OptionsPattern[]]:=
-Module[{pg,ratio,argpg,resonantEqn,pStar,pp,pgTest},
+Module[{pg,ratio,argpg,resonantEqn,pStar,pp,pgTest,pSep},
 	(*See if the user specified some precision goal *)
-	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidXQ[x]||Not@ValidResIntQ[\[Beta]r,\[Beta]\[Theta]],Abort[]];
-	If[OptionValue[Rotation]=="Prograde" & x<0, Abort[]];
-	If[OptionValue[Rotation]=="Retrograde" & x>0, Abort[]];
-	
+	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidXQ[x]||Not@ValidResIntQ[\[Beta]r,\[Beta]\[Theta],0],Abort[]];
 	pg=OptionValue[PrecisionGoal];
 	ratio=\[Beta]r/\[Beta]\[Theta];
+	If[x>0&&ratio<0, Message[KerrGeoFindResonance::invalidPrograde]; Abort[]];
+	If[x<0&&ratio>0, Message[KerrGeoFindResonance::invalidRetrograde]; Abort[]];
 	(* pStar provides an initial guess for p. Note that p = pStar for e = 0 and a = 0*)
 	pStar=6/(1-ratio^2); (* See Eq 30 *)
 
 	(* Resonant condition defined by the equation below *)
-	resonantEqn[p_?NumericQ]:=Sqrt[y1y2[a,p,e,x]]Rf[0,1+del2y2[a,p,e,x],1-del2y2[a,p,e,x]]/Rf[0,1+del1y1[a,p,e,x],1-del1y1[a,p,e,x]]-ratio;
+	resonantEqn[p_?NumericQ]:=r\[Theta]Ratio[a, p, e, x]-Abs[ratio];
 	
 	(* Working precision of the root-finding method is based on the precision specified
 	 by the PrecisionGoal option, or the precision of the arguments. MachinePrecision
@@ -484,18 +506,17 @@ Module[{pg,ratio,argpg,resonantEqn,pStar,pp,pgTest},
 (*Given (a,p,x) and Subscript[\[CapitalOmega], r]/Subscript[\[CapitalOmega], \[Theta]]= Subscript[\[Beta], r]/Subscript[\[Beta], \[Theta]] find e*)
 
 
-Options[KerrGeoOrbitRThetaResonantE]={PrecisionGoal->Automatic, Rotation->"Both"};
+Options[KerrGeoOrbitRThetaResonantE]={PrecisionGoal->Automatic};
 
 
 KerrGeoOrbitRThetaResonantE[a_?NumericQ, p_?NumericQ, x_?NumericQ, {\[Beta]r_Integer, \[Beta]\[Theta]_Integer}, opts:OptionsPattern[]]:=
 Module[{pg,argpg,resonantEqn,e0Test,e1Test,eGuess,ee,ratio},
 	(*See if the user specified some precision goal *)
-	If[Not@ValidAQ[a]||Not@ValidXQ[x]||Not@ValidResIntQ[\[Beta]r,\[Beta]\[Theta]],Abort[]];
-	If[OptionValue[Rotation]=="Prograde" & x<0, Abort[]];
-	If[OptionValue[Rotation]=="Retrograde" & x>0, Abort[]];
-	
+	If[Not@ValidAQ[a]||Not@ValidXQ[x]||Not@ValidResIntQ[\[Beta]r,\[Beta]\[Theta],0],Abort[]];
 	pg=OptionValue[PrecisionGoal];
 	ratio=\[Beta]r/\[Beta]\[Theta];
+	If[x>0&&ratio<0, Message[KerrGeoFindResonance::invalidPrograde]; Abort[]];
+	If[x<0&&ratio>0, Message[KerrGeoFindResonance::invalidRetrograde]; Abort[]];
 	
 	(* Test to see if there is an eccentricity that will lead to a bound orbital resonance 
 	 based on the provided values of a, p, x *)
@@ -507,7 +528,7 @@ Module[{pg,argpg,resonantEqn,e0Test,e1Test,eGuess,ee,ratio},
 	eGuess=(p-e0Test)/(e1Test-e0Test);
 
 	(* Resonant condition defined by the equation below *)
-	resonantEqn[e_?NumericQ]:=Sqrt[y1y2[a,p,e,x]]Rf[0,1+del2y2[a,p,e,x],1-del2y2[a,p,e,x]]/Rf[0,1+del1y1[a,p,e,x],1-del1y1[a,p,e,x]]-ratio;
+	resonantEqn[e_?NumericQ]:=r\[Theta]Ratio[a, p, e, x]-Abs[ratio];
 	
 	(* Working precision of the root-finding method is based on the precision specified
 	 by the PrecisionGoal option, or the precision of the arguments. MachinePrecision
@@ -529,30 +550,29 @@ Module[{pg,argpg,resonantEqn,e0Test,e1Test,eGuess,ee,ratio},
 (*Given (a,p,e) and Subscript[\[CapitalOmega], r]/Subscript[\[CapitalOmega], \[Theta]]= Subscript[\[Beta], r]/Subscript[\[Beta], \[Theta]] find x*)
 
 
-Options[KerrGeoOrbitRThetaResonantX]={PrecisionGoal->Automatic, Rotation->"Both"};
+Options[KerrGeoOrbitRThetaResonantX]={PrecisionGoal->Automatic};
 
 
 KerrGeoOrbitRThetaResonantX[a_?NumericQ, p_?NumericQ, e_?NumericQ, {\[Beta]r_Integer, \[Beta]\[Theta]_Integer}, opts:OptionsPattern[]]:=
-Module[{pg,rtt,argpg,resonantEqn,x1Test1,x1Test2,xGuess,xx,xxx,ratio},
+Module[{pg,argpg,resonantEqn,x0Test,x1Test,xGuess,xx,xxx,ratio},
 	(*See if the user specified some precision goal *)
-	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidResIntQ[\[Beta]r,\[Beta]\[Theta]],Abort[]];
-	
-	rtt=OptionValue[Rotation];
+	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidResIntQ[\[Beta]r,\[Beta]\[Theta],0],Abort[]];
+
 	pg=OptionValue[PrecisionGoal];
 	ratio=\[Beta]r/\[Beta]\[Theta];
-	
 	(* Test to see if there is an inclination angle that will lead to a bound orbital resonance 
 	 based on the provided values of a, p, e *)
-	x1Test1=KerrGeoOrbitRThetaResonantP[a,e,1,{\[Beta]r,\[Beta]\[Theta]},PrecisionGoal->pg];
-	x1Test2=KerrGeoOrbitRThetaResonantP[a,e,-1,{\[Beta]r,\[Beta]\[Theta]},PrecisionGoal->pg];
+	x0Test=KerrGeoOrbitRThetaResonantP[a,e,0,{\[Beta]r,\[Beta]\[Theta]},opts];
+	x1Test=KerrGeoOrbitRThetaResonantP[a,e,Sign[ratio],{\[Beta]r,\[Beta]\[Theta]},opts];
 	
-	If[p>x1Test2 || p< x1Test1, Message[KerrGeoFindResonance::noresonance, x1Test1, x1Test2]; Abort[];];
-	If[p==x1Test1,Return[1]];
-	If[p==x1Test2,Return[-1]];
-	xGuess=-(2p-(x1Test2+x1Test1))/(x1Test2-x1Test1);
+	If[ratio>0 && (p<x1Test||x0Test<p), Message[KerrGeoFindResonance::noresonance, x1Test, x0Test]; Abort[];];
+	If[ratio<0 && (p<x0Test||x1Test<p), Message[KerrGeoFindResonance::noresonance, x0Test, x1Test]; Abort[];];
+	If[p==x0Test,Return[0]];
+	If[p==x1Test,Return[Sign[ratio]]];
+	xGuess=Sign[ratio](p-x0Test)/(x1Test-x0Test);
 
 	(* Resonant condition defined by the equation below *)
-	resonantEqn[x_?NumericQ]:=Sqrt[y1y2[a,p,e,x]]Rf[0,1+del2y2[a,p,e,x],1-del2y2[a,p,e,x]]/Rf[0,1+del1y1[a,p,e,x],1-del1y1[a,p,e,x]]-ratio;
+	resonantEqn[x_?NumericQ]:=r\[Theta]Ratio[a, p, e, x]-Abs[ratio];
 	
 	(* Working precision of the root-finding method is based on the precision specified
 	 by the PrecisionGoal option, or the precision of the arguments. MachinePrecision
@@ -566,10 +586,7 @@ Module[{pg,rtt,argpg,resonantEqn,x1Test1,x1Test2,xGuess,xx,xxx,ratio},
 		xxx=Re[xx/.FindRoot[resonantEqn[xx],{xx,xGuess}]],
 		xxx=Re[xx/.FindRoot[resonantEqn[xx],{xx,xGuess},PrecisionGoal->pg,WorkingPrecision->0.95argpg]],
 		xxx=Re[xx/.FindRoot[resonantEqn[xx],{xx,xGuess},PrecisionGoal->pg,WorkingPrecision->0.95argpg]]
-	];
-	If[(rtt=="Prograde"&&xxx>0)||(rtt=="Retrograde"&&xxx<0)||rtt=="Both", Return[xxx]];
-	If[rtt=="Prograde"&&xxx<0, Message[KerrGeoFindResonance::retrograde, xxx]; Abort[]];
-	If[rtt=="Retrograde"&&xxx>0, Message[KerrGeoFindResonance::prograde, xxx]; Abort[]];
+	]
 ];
 
 
@@ -585,13 +602,14 @@ Module[{pg,rtt,argpg,resonantEqn,x1Test1,x1Test2,xGuess,xx,xxx,ratio},
 (*Same as those of r\[Theta]-resonance*)
 
 
-(* ::Subsubsection::Closed:: *)
+(* ::Subsubsection:: *)
 (*Useful functions for root-finding*)
 
 
-r\[Phi]Ratio[a_, p_, e_, x_/;x!=0] := Abs[KerrGeoFrequencies[a, p, e, x, Time->"Mino"]["\!\(\*SubscriptBox[\(\[CapitalUpsilon]\), \(r\)]\)"]/KerrGeoFrequencies[a, p, e, x, Time->"Mino"]["\!\(\*SubscriptBox[\(\[CapitalUpsilon]\), \(\[Phi]\)]\)"]]
+r\[Phi]Ratio[a_, p_, e_, x_/;x!=0]:= Sign[x] ("\!\(\*SubscriptBox[\(\[CapitalUpsilon]\), \(r\)]\)")/("\!\(\*SubscriptBox[\(\[CapitalUpsilon]\), \(\[Phi]\)]\)")/.KerrGeoFrequencies[a, p, e, x, Time->"Mino"]
 
-r\[Phi]Ratio[a_, p_, e_/;e!=1, x_/;x==0]:=
+
+r\[Phi]Ratio[a_, p_, e_/;e<1, x_/;x==0]:=
 Module[{S, P, r1, r2, r3, r4, EnSquared, Q, kr, k\[Theta], factor1, factor2, rPlus, rMinus, hPlus, hMinus, hr, BrPlus, BrMinus, Br, r\[Theta]Ratio},
 	(* S=r3+r4, P=r3*r4 *)
 	P = (a^2(a^4(-1+e^2)2+p^4+2a^2p(-2+p+e^2(2+p))))/(a^4(-1+e^2)^2+2a^2(1+e^2)p^2+(-4+p)p^3);
@@ -602,8 +620,8 @@ Module[{S, P, r1, r2, r3, r4, EnSquared, Q, kr, k\[Theta], factor1, factor2, rPl
     r2 = p/(1+e);
     r3 = (S+Sqrt[S^2-4P])/2;
     r4 = (S-Sqrt[S^2-4P])/2;
-    kr = (r1-r2)/(r1-r3)(r3-r4)/(r2-r4);
-    k\[Theta] = (1-EnSquared)a^2/Q;
+    kr = Abs[(r1-r2)/(r1-r3)(r3-r4)/(r2-r4)];
+    k\[Theta] = Abs[(1-EnSquared)a^2/Q];
     factor1 = Sqrt[(r1-r3)(r2-r4)2(1-e^2)a^2/(2p^2P)];
     r\[Theta]Ratio = factor1 EllipticK[k\[Theta]]/EllipticK[kr];
     
@@ -617,8 +635,9 @@ Module[{S, P, r1, r2, r3, r4, EnSquared, Q, kr, k\[Theta], factor1, factor2, rPl
     BrMinus = rMinus/(r3-rMinus)(EllipticK[kr]-(r2-r3)/(r2-rMinus)EllipticPi[hPlus, kr]);
     Br = factor2(BrPlus-BrMinus);
     (* {prograde, retrograde} *)
-    {Abs[1/(1/r\[Theta]Ratio+Br)],Abs[1/(-1/r\[Theta]Ratio+Br)]}
-]
+    {1/(1/r\[Theta]Ratio+Br),-1/(-1/r\[Theta]Ratio+Br)}
+];
+
 
 r\[Phi]Ratio[a_, p_, e_/;e==1, x_/;x==0]:=
 Module[{S, P, r1, r2, r3, r4, EnSquared, Q, kr, k\[Theta], factor1, factor2, rPlus, rMinus, hPlus, hMinus, hr, BrPlus, BrMinus, Br, r\[Theta]Ratio},
@@ -645,33 +664,37 @@ Module[{S, P, r1, r2, r3, r4, EnSquared, Q, kr, k\[Theta], factor1, factor2, rPl
     BrMinus = rMinus/(r3-rMinus)(EllipticK[kr]-(r2-r3)/(r2-rMinus)EllipticPi[hPlus, kr]);
     Br = factor2(BrPlus-BrMinus);
     (* {prograde, retrograde} *)
-    {Abs[1/(1/r\[Theta]Ratio+Br)],Abs[1/(-1/r\[Theta]Ratio+Br)]}
-]
+    {1/(1/r\[Theta]Ratio+Br),-1/(-1/r\[Theta]Ratio+Br)}
+];
 
 
 (* ::Subsubsection::Closed:: *)
 (*Given (a,e,x) and Subscript[\[CapitalOmega], r]/Subscript[\[CapitalOmega], \[Phi]]= Subscript[\[Beta], r]/Subscript[\[Beta], \[Phi]] find p*)
 
 
-Options[KerrGeoOrbitRPhiResonantP]={PrecisionGoal->Automatic, Rotation->"Both"};
+Options[KerrGeoOrbitRPhiResonantP]={PrecisionGoal->Automatic};
 
 
-KerrGeoOrbitRPhiResonantP[a_?NumericQ, e_?NumericQ, x_?NumericQ/;x!=0, {\[Beta]r_Integer, \[Beta]\[Phi]_Integer}, opts:OptionsPattern[]]:=
-Module[{pg,rtt,ratio,argpg,resonantEqn,pStar,pp,pgTest},
+KerrGeoOrbitRPhiResonantP[a_?NumericQ, e_?NumericQ, x_?NumericQ, {\[Beta]r_Integer, \[Beta]\[Phi]_Integer}, opts:OptionsPattern[]]:=
+Module[{pg,ratio,argpg,resonantEqn,pStar,pp,pgTest},
 	(*See if the user specified some precision goal *)
-	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidXQ[x]||Not@ValidResIntQ[\[Beta]r,\[Beta]\[Phi]],Abort[]];
-	
-	rtt=OptionValue[Rotation];
-	If[rtt=="Prograde" & x<0, Abort[]];
-	If[rtt=="Retrograde" & x>0, Abort[]];
+	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidXQ[x]||Not@ValidResIntQ[\[Beta]r,0,\[Beta]\[Phi]],Abort[]];
 	
 	pg=OptionValue[PrecisionGoal];
 	ratio=\[Beta]r/\[Beta]\[Phi];
+	If[x>0&&ratio<0, Message[KerrGeoFindResonance::invalidPrograde]; Abort[]];
+	If[x<0&&ratio>0, Message[KerrGeoFindResonance::invalidRetrograde]; Abort[]];
 	(* pStar provides an initial guess for p. Note that p = pStar for e = 0 and a = 0*)
 	pStar=6/(1-ratio^2);
-
+	
 	(* Resonant condition defined by the equation below *)
-	resonantEqn[p_?NumericQ]:=r\[Phi]Ratio[a, p, e, x]-ratio;
+	If[x==0,
+		If[ratio>0,
+			resonantEqn[p_?NumericQ]:= r\[Phi]Ratio[a, p, e, x][[1]]-Abs[ratio],
+			resonantEqn[p_?NumericQ]:= r\[Phi]Ratio[a, p, e, x][[2]]-Abs[ratio]
+		],
+		resonantEqn[p_?NumericQ]:= r\[Phi]Ratio[a, p, e, x]-Abs[ratio]
+	];
 	
 	(* Working precision of the root-finding method is based on the precision specified
 	 by the PrecisionGoal option, or the precision of the arguments. MachinePrecision
@@ -682,55 +705,10 @@ Module[{pg,rtt,ratio,argpg,resonantEqn,pStar,pp,pgTest},
 	If[pg==Infinity,pg=$MachinePrecision];
 	
 	If[pg==$MachinePrecision,
-		Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar}]],
+		Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar},StepMonitor:>Print[pp]]],
 		Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar},PrecisionGoal->pg,WorkingPrecision->pg]],
 		Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar},PrecisionGoal->pg,WorkingPrecision->pg]]
 	]
-];
-
-KerrGeoOrbitRPhiResonantP[a_?NumericQ, e_?NumericQ, x_?NumericQ/;x==0, {\[Beta]r_Integer, \[Beta]\[Phi]_Integer}, opts:OptionsPattern[]]:=
-Module[{pg,rtt,ratio,argpg,resonantEqn,pStar,pp,pp1,pp2,pgTest},
-	(*See if the user specified some precision goal *)
-	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidXQ[x]||Not@ValidResIntQ[\[Beta]r,\[Beta]\[Phi]],Abort[]];
-	
-	rtt=OptionValue[Rotation];
-	pg=OptionValue[PrecisionGoal];
-	ratio=\[Beta]r/\[Beta]\[Phi];
-	(* pStar provides an initial guess for p. Note that p = pStar for e = 0 and a = 0*)
-	pStar=6/(1-ratio^2);
-	If[rtt=="Prograde"||rtt=="Both",
-		(* Resonant condition defined by the equation below *)
-		resonantEqn[p_?NumericQ]:=r\[Phi]Ratio[a, p, e, 0][[1]]-ratio;
-		(* Working precision of the root-finding method is based on the precision specified
-			by the PrecisionGoal option, or the precision of the arguments. MachinePrecision
-			is the default precision if not other precision specifications are made. *)
-		argpg=Precision[{resonantEqn[pStar],a,e,x,ratio}];
-		If[argpg==$MachinePrecision,pg=argpg];
-		If[(Not@NumericQ[pg]||pg>argpg),pg=argpg];
-		If[pg==Infinity,pg=$MachinePrecision];
-		If[pg==$MachinePrecision,
-				pp1=Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar}]],
-				pp1=Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar},PrecisionGoal->pg,WorkingPrecision->pg]],
-				pp1=Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar},PrecisionGoal->pg,WorkingPrecision->pg]]
-		];
-	];
-	If[rtt=="Retrograde"||rtt=="Both",
-		(* Resonant condition defined by the equation below *)
-		resonantEqn[p_?NumericQ]:=r\[Phi]Ratio[a, p, e, 0][[2]]-ratio;
-		(* Working precision of the root-finding method is based on the precision specified
-		by the PrecisionGoal option, or the precision of the arguments. MachinePrecision
-		is the default precision if not other precision specifications are made. *)
-		argpg=Precision[{resonantEqn[pStar],a,e,x,ratio}];
-		If[argpg==$MachinePrecision,pg=argpg];
-		If[(Not@NumericQ[pg]||pg>argpg),pg=argpg];
-		If[pg==Infinity,pg=$MachinePrecision];
-		If[pg==$MachinePrecision,
-				pp2=Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar}]],
-				pp2=Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar},PrecisionGoal->pg,WorkingPrecision->pg]],
-				pp2=Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar},PrecisionGoal->pg,WorkingPrecision->pg]]
-		];
-	];
-	Switch[rtt,"Prograde", Return[pp1],"Retrograde", Return[pp2],"Both", Return[{pp1, pp2}]];
 ];
 
 
@@ -738,20 +716,18 @@ Module[{pg,rtt,ratio,argpg,resonantEqn,pStar,pp,pp1,pp2,pgTest},
 (*Given (a,p,x) and Subscript[\[CapitalOmega], r]/Subscript[\[CapitalOmega], \[Phi]]= Subscript[\[Beta], r]/Subscript[\[Beta], \[Phi]] find e*)
 
 
-Options[KerrGeoOrbitRPhiResonantE]={PrecisionGoal->Automatic, Rotation->"Both"};
+Options[KerrGeoOrbitRPhiResonantE]={PrecisionGoal->Automatic};
 
 
-KerrGeoOrbitRPhiResonantE[a_?NumericQ, p_?NumericQ, x_?NumericQ/;x!=0, {\[Beta]r_Integer, \[Beta]\[Phi]_Integer}, opts:OptionsPattern[]]:=
-Module[{pg,rtt,argpg,resonantEqn,e0Test,e1Test,eGuess,ee,ratio},
+KerrGeoOrbitRPhiResonantE[a_?NumericQ, p_?NumericQ, x_?NumericQ, {\[Beta]r_Integer, \[Beta]\[Phi]_Integer}, opts:OptionsPattern[]]:=
+Module[{pg,argpg,resonantEqn,e0Test,e1Test,eGuess,ee,ratio},
 	(*See if the user specified some precision goal *)
-	If[Not@ValidAQ[a]||Not@ValidXQ[x]||Not@ValidResIntQ[\[Beta]r,\[Beta]\[Phi]],Abort[]];
+	If[Not@ValidAQ[a]||Not@ValidXQ[x]||Not@ValidResIntQ[\[Beta]r,0,\[Beta]\[Phi]],Abort[]];
 	
 	pg=OptionValue[PrecisionGoal];
-	rtt=OptionValue[Rotation];
-	If[rtt=="Prograde" & x<0, Abort[]];
-	If[rtt=="Retrograde" & x>0, Abort[]];
-	
 	ratio=\[Beta]r/\[Beta]\[Phi];
+	If[x>0&&ratio<0, Message[KerrGeoFindResonance::invalidPrograde]; Abort[]];
+	If[x<0&&ratio>0, Message[KerrGeoFindResonance::invalidRetrograde]; Abort[]];
 	
 	(* Test to see if there is an eccentricity that will lead to a bound orbital resonance 
 	 based on the provided values of a, p, x *)
@@ -763,7 +739,13 @@ Module[{pg,rtt,argpg,resonantEqn,e0Test,e1Test,eGuess,ee,ratio},
 	eGuess=(p-e0Test)/(e1Test-e0Test);
 
 	(* Resonant condition defined by the equation below *)
-	resonantEqn[e_?NumericQ]:= r\[Phi]Ratio[a, p, e, x]-ratio;
+	If[x==0,
+		If[ratio>0,
+			resonantEqn[e_?NumericQ]:= r\[Phi]Ratio[a, p, e, x][[1]]-Abs[ratio],
+			resonantEqn[e_?NumericQ]:= r\[Phi]Ratio[a, p, e, x][[2]]-Abs[ratio]
+		],
+		resonantEqn[e_?NumericQ]:= r\[Phi]Ratio[a, p, e, x]-Abs[ratio]
+	];
 	
 	(* Working precision of the root-finding method is based on the precision specified
 	 by the PrecisionGoal option, or the precision of the arguments. MachinePrecision
@@ -780,183 +762,411 @@ Module[{pg,rtt,argpg,resonantEqn,e0Test,e1Test,eGuess,ee,ratio},
 	]
 ];
 
-KerrGeoOrbitRPhiResonantE[a_?NumericQ, p_?NumericQ, x_?NumericQ/;x==0, {\[Beta]r_Integer, \[Beta]\[Phi]_Integer}, opts:OptionsPattern[]]:=
-Module[{pg,rtt,argpg,resonantEqn,e0Test,e1Test,eGuess,ee,ee1,ee2,ratio},
-	(*See if the user specified some precision goal *)
-	If[Not@ValidAQ[a]||Not@ValidXQ[x]||Not@ValidResIntQ[\[Beta]r,\[Beta]\[Phi]],Abort[]];
-	
-	pg=OptionValue[PrecisionGoal];
-	rtt=OptionValue[Rotation];
-	
-	ratio=\[Beta]r/\[Beta]\[Phi];
-	e0Test=KerrGeoOrbitRPhiResonantP[a,0,x,{\[Beta]r,\[Beta]\[Phi]},opts];
-	e1Test=KerrGeoOrbitRPhiResonantP[a,1,x,{\[Beta]r,\[Beta]\[Phi]},opts];
-	
-	If[rtt=="Prograde",
-		If[p<e0Test||e1Test<p, Message[KerrGeoFindResonance::noresonance, e0Test, e1Test]; Abort[];];
-		If[p==e0Test,Return[0]];
-		If[p==e1Test,Return[1]];
-		eGuess=(p-e0Test)/(e1Test-e0Test);
-	
-		(* Resonant condition defined by the equation below *)
-		resonantEqn[e_?NumericQ]:= r\[Phi]Ratio[a, p, e, x][[1]]-ratio;
-		
-		(* Working precision of the root-finding method is based on the precision specified
-		 by the PrecisionGoal option, or the precision of the arguments. MachinePrecision
-		 is the default precision if not other precision specifications are made. *)
-		argpg=Precision[{resonantEqn[eGuess],a,p,x,ratio}];
-		If[argpg==$MachinePrecision,pg=argpg];
-		If[(Not@NumericQ[pg]||pg>argpg),pg=argpg];
-		If[pg==Infinity,pg=$MachinePrecision];
-		If[pg==$MachinePrecision,
-			ee1=Re[ee/.FindRoot[resonantEqn[ee],{ee,eGuess}]],
-			ee1=Re[ee/.FindRoot[resonantEqn[ee],{ee,eGuess},PrecisionGoal->pg,WorkingPrecision->pg]],
-			ee1=Re[ee/.FindRoot[resonantEqn[ee],{ee,eGuess},PrecisionGoal->pg,WorkingPrecision->pg]]
-		];
-		Return[ee1];
-	];
-	
-	If[rtt=="Retrograde",
-		If[p<e0Test||e1Test<p, Message[KerrGeoFindResonance::noresonance, e0Test, e1Test]; Abort[];];
-		If[p==e0Test,Return[0]];
-		If[p==e1Test,Return[1]];
-		eGuess=(p-e0Test)/(e1Test-e0Test);
-	
-		(* Resonant condition defined by the equation below *)
-		resonantEqn[e_?NumericQ]:= r\[Phi]Ratio[a, p, e, x][[2]]-ratio;
-		
-		(* Working precision of the root-finding method is based on the precision specified
-		 by the PrecisionGoal option, or the precision of the arguments. MachinePrecision
-		 is the default precision if not other precision specifications are made. *)
-		argpg=Precision[{resonantEqn[eGuess],a,p,x,ratio}];
-		If[argpg==$MachinePrecision,pg=argpg];
-		If[(Not@NumericQ[pg]||pg>argpg),pg=argpg];
-		If[pg==Infinity,pg=$MachinePrecision];
-		If[pg==$MachinePrecision,
-			ee2=Re[ee/.FindRoot[resonantEqn[ee],{ee,eGuess}]],
-			ee2=Re[ee/.FindRoot[resonantEqn[ee],{ee,eGuess},PrecisionGoal->pg,WorkingPrecision->pg]],
-			ee2=Re[ee/.FindRoot[resonantEqn[ee],{ee,eGuess},PrecisionGoal->pg,WorkingPrecision->pg]]
-		];
-		Return[ee2];
-	];
-	
-	If[rtt=="Both",
-		If[p<e0Test[[2]]||e1Test[[2]]<p<e0Test[[1]]|| e1Test[[1]]<p,
-			Message[KerrGeoFindResonance::noresonance, e0Test[[1]], e1Test[[1]]];
-			Message[KerrGeoFindResonance::noresonance, e0Test[[2]], e1Test[[2]]];
-			Abort[]
-		];
-		If[e0Test[[1]]<p<e1Test[[1]],
-			eGuess=(p-e0Test[[1]])/(e1Test[[1]]-e0Test[[1]]);
-			resonantEqn[e_?NumericQ]:= r\[Phi]Ratio[a, p, e, x][[1]]-ratio;
-			argpg=Precision[{resonantEqn[eGuess],a,p,x,ratio}];
-			If[argpg==$MachinePrecision,pg=argpg];
-			If[(Not@NumericQ[pg]||pg>argpg),pg=argpg];
-			If[pg==Infinity,pg=$MachinePrecision];
-			If[pg==$MachinePrecision,
-				ee1=Re[ee/.FindRoot[resonantEqn[ee],{ee,eGuess}]],
-				ee1=Re[ee/.FindRoot[resonantEqn[ee],{ee,eGuess},PrecisionGoal->pg,WorkingPrecision->pg]],
-				ee1=Re[ee/.FindRoot[resonantEqn[ee],{ee,eGuess},PrecisionGoal->pg,WorkingPrecision->pg]]
-			];
-			Return[ee1];
-		];
-		If[e0Test[[2]]<p<e1Test[[2]],
-			eGuess=(p-e0Test[[2]])/(e1Test[[2]]-e0Test[[2]]);
-			resonantEqn[e_?NumericQ]:= r\[Phi]Ratio[a, p, e, x][[2]]-ratio;
-			argpg=Precision[{resonantEqn[eGuess],a,p,x,ratio}];
-			If[argpg==$MachinePrecision,pg=argpg];
-			If[(Not@NumericQ[pg]||pg>argpg),pg=argpg];
-			If[pg==Infinity,pg=$MachinePrecision];
-			If[pg==$MachinePrecision,
-				ee2=Re[ee/.FindRoot[resonantEqn[ee],{ee,eGuess}]],
-				ee2=Re[ee/.FindRoot[resonantEqn[ee],{ee,eGuess},PrecisionGoal->pg,WorkingPrecision->pg]],
-				ee2=Re[ee/.FindRoot[resonantEqn[ee],{ee,eGuess},PrecisionGoal->pg,WorkingPrecision->pg]]
-			];
-			Return[ee2];	
-		];
-	];
-];
 
-
-(* ::Subsubsection:: *)
+(* ::Subsubsection::Closed:: *)
 (*Given (a,p,e) and Subscript[\[CapitalOmega], r]/Subscript[\[CapitalOmega], \[Phi]]= Subscript[\[Beta], r]/Subscript[\[Beta], \[Phi]] find x*)
 
 
-Options[KerrGeoOrbitRPhiResonantX]={PrecisionGoal->Automatic, Rotation->"Both"};
+Options[KerrGeoOrbitRPhiResonantX]={PrecisionGoal->Automatic};
 
 
 KerrGeoOrbitRPhiResonantX[a_?NumericQ, p_?NumericQ, e_?NumericQ, {\[Beta]r_Integer, \[Beta]\[Phi]_Integer}, opts:OptionsPattern[]]:=
-Module[{pg,rtt,argpg,resonantEqn,x0Test1,x0Test2,x1Test1,x1Test2,xGuess,xx1,xx2,xx,ratio},
+Module[{pg,rtt,argpg,resonantEqn,x0Test, x1Test, x0Test1,x0Test2,x1Test1,x1Test2,xGuess,xx1,xx2,xx,ratio},
 	(*See if the user specified some precision goal *)
-	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidResIntQ[\[Beta]r,\[Beta]\[Phi]],Abort[]];
-	
-	rtt=OptionValue[Rotation];
+	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidResIntQ[\[Beta]r,0,\[Beta]\[Phi]],Abort[]];
 	pg=OptionValue[PrecisionGoal];
 	ratio=\[Beta]r/\[Beta]\[Phi];
 	
 	(* Test to see if there is an eccentricity that will lead to a bound orbital resonance 
-	 based on the provided values of a, p, x *)
-	{x0Test1,x0Test2}=KerrGeoOrbitRPhiResonantP[a,e,0,{\[Beta]r,\[Beta]\[Phi]}, PrecisionGoal->pg];
-	x1Test1=KerrGeoOrbitRPhiResonantP[a,e,1,{\[Beta]r,\[Beta]\[Phi]}, PrecisionGoal->pg];
-	x1Test2=KerrGeoOrbitRPhiResonantP[a,e,-1,{\[Beta]r,\[Beta]\[Phi]}, PrecisionGoal->pg];
-	If[p<x1Test1||x1Test2<p, Message[KerrGeoFindResonance::noresonance, x1Test1, x1Test2]; Abort[];];
-	If[x1Test1<p<x0Test2&&rtt=="Retrograde", Message[KerrGeoFindResonance::noresonance, x0Test2, x1Test2]; Abort[];];
-	If[x0Test1<p<x1Test2&&rtt=="Prograde", Message[KerrGeoFindResonance::noresonance, x1Test1, x0Test1]; Abort[];];
-	If[p==x1Test1,Return[1]];
-	If[p==x1Test2,Return[-1]];
-	If[p==x0Test1||p==x0Test2,Return[0]];
-	(* Resonant condition defined by the equation below *)
-	resonantEqn[x_?NumericQ]:=r\[Phi]Ratio[a, p, e, x]-ratio;
+	based on the provided values of a, p, x *)
+	(*See if the user specified some precision goal *)
+	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidResIntQ[\[Beta]r,\[Beta]\[Theta]],Abort[]];
+
+	pg=OptionValue[PrecisionGoal];
+	ratio=\[Beta]r/\[Beta]\[Phi];
+	(* Test to see if there is an inclination angle that will lead to a bound orbital resonance 
+	 based on the provided values of a, p, e *)
+	x0Test=KerrGeoOrbitRPhiResonantP[a,e,0,{\[Beta]r,\[Beta]\[Phi]},opts];
+	x1Test=KerrGeoOrbitRPhiResonantP[a,e,Sign[ratio],{\[Beta]r,\[Beta]\[Phi]},opts];
 	
-	If[x1Test1<p<x0Test1&&(rtt=="Prograde"||rtt=="Both"),
-		xGuess = (p-x0Test1)/(x1Test1-x0Test1);
-		(* Working precision of the root-finding method is based on the precision specified
-		 by the PrecisionGoal option, or the precision of the arguments. MachinePrecision
-		 is the default precision if not other precision specifications are made. *)
-		argpg=Precision[{resonantEqn[xGuess],a,p,e,ratio}];
-		If[argpg==$MachinePrecision,pg=0.9argpg];
-		If[(Not@NumericQ[pg]||pg>argpg),pg=0.9argpg];
-		If[pg==Infinity,pg=$MachinePrecision];
-		If[pg==$MachinePrecision,
-			xx1=Re[xx/.FindRoot[resonantEqn[xx],{xx,xGuess}]],
-			xx1=Re[xx/.FindRoot[resonantEqn[xx],{xx,xGuess},PrecisionGoal->pg,WorkingPrecision->0.95argpg]],
-			xx1=Re[xx/.FindRoot[resonantEqn[xx],{xx,xGuess},PrecisionGoal->pg,WorkingPrecision->0.95argpg]]
-		]
-	];
-	If[x0Test2<p<x1Test2&&(rtt=="Retrograde"||rtt=="Both"),
-		xGuess = -(p-x0Test2)/(x1Test2-x0Test2);
-		(* Working precision of the root-finding method is based on the precision specified
-		 by the PrecisionGoal option, or the precision of the arguments. MachinePrecision
-		 is the default precision if not other precision specifications are made. *)
-		argpg=Precision[{resonantEqn[xGuess],a,p,e,ratio}];
-		If[argpg==$MachinePrecision,pg=0.9argpg];
-		If[(Not@NumericQ[pg]||pg>argpg),pg=0.9argpg];
-		If[pg==Infinity,pg=$MachinePrecision];
-		If[pg==$MachinePrecision,
-			xx2=Re[xx/.FindRoot[resonantEqn[xx],{xx,xGuess}]],
-			xx2=Re[xx/.FindRoot[resonantEqn[xx],{xx,xGuess},PrecisionGoal->pg,WorkingPrecision->0.95argpg]],
-			xx2=Re[xx/.FindRoot[resonantEqn[xx],{xx,xGuess},PrecisionGoal->pg,WorkingPrecision->0.95argpg]]
-		]
-	];
-	Switch[rtt,
-		"Prograde", Return[xx1],
-		"Retrograde", Return[xx2],
-		"Both", 
-			If[x1Test1<p<x0Test2, Return[xx1]];
-			If[x0Test2<p<x0Test1, Return[{xx1, xx2}]];
-			If[x0Test1<p<x1Test2, Return[xx2]];
-	];
+	If[ratio>0 && (p<x1Test||x0Test<p), Message[KerrGeoFindResonance::noresonance, x1Test, x0Test]; Abort[];];
+	If[ratio<0 && (p<x0Test||x1Test<p), Message[KerrGeoFindResonance::noresonance, x0Test, x1Test]; Abort[];];
+	If[p==x0Test,Return[0]];
+	If[p==x1Test,Return[Sign[ratio]]];
+	xGuess=Sign[ratio](p-x0Test)/(x1Test-x0Test);
+
+	(* Resonant condition defined by the equation below *)
+	resonantEqn[x_?NumericQ]:=r\[Phi]Ratio[a, p, e, x]-Abs[ratio];
+	
+	(* Working precision of the root-finding method is based on the precision specified
+	 by the PrecisionGoal option, or the precision of the arguments. MachinePrecision
+	 is the default precision if not other precision specifications are made. *)
+	argpg=Precision[{a,p,e,ratio}];
+	If[argpg==$MachinePrecision,pg=0.9argpg];
+	If[(Not@NumericQ[pg]||pg>argpg),pg=0.9argpg];
+	If[pg==Infinity,pg=$MachinePrecision];
+
+	If[pg==$MachinePrecision,
+		xxx=Re[xx/.FindRoot[resonantEqn[xx],{xx,xGuess}]],
+		xxx=Re[xx/.FindRoot[resonantEqn[xx],{xx,xGuess},PrecisionGoal->pg,WorkingPrecision->0.95argpg]],
+		xxx=Re[xx/.FindRoot[resonantEqn[xx],{xx,xGuess},PrecisionGoal->pg,WorkingPrecision->0.95argpg]]
+	]
 ];
 
 
 (* ::Subsection:: *)
+(*\[Phi]\[Theta]-resonance*)
+
+
+(* ::Subsubsection:: *)
+(*Testing functions*)
+
+
+(* ::Text:: *)
+(*Same as those of r\[Theta]-resonance*)
+
+
+(* ::Subsubsection:: *)
+(*Useful functions for root-finding*)
+
+
+\[Phi]\[Theta]Ratio[a_, p_, e_, x_/;x!=0]:=Sign[x] ("\!\(\*SubscriptBox[\(\[CapitalUpsilon]\), \(\[Phi]\)]\)")/("\!\(\*SubscriptBox[\(\[CapitalUpsilon]\), \(\[Theta]\)]\)")/.KerrGeoFrequencies[a, p, e, x, Time->"Mino"]
+
+
+\[Phi]\[Theta]Ratio[a_, p_, e_/;e!=1, x_/;x==0]:=
+Module[{S, P, r1, r2, r3, r4, EnSquared, Q, kr, k\[Theta], factor1, factor2, rPlus, rMinus, hPlus, hMinus, hr, BrPlus, BrMinus, Br, r\[Theta]Ratio},
+	(* S=r3+r4, P=r3*r4 *)
+	P = (a^2(a^4(-1+e^2)2+p^4+2a^2p(-2+p+e^2(2+p))))/(a^4(-1+e^2)^2+2a^2(1+e^2)p^2+(-4+p)p^3);
+	S = (2(a^2(-1+e^2)+p^2)^2)/(a^4(-1+e^2)^2+2a^2(1+e^2)p^2+(-4+p)p^3);
+	EnSquared = 1+2(-1+e^2)/(2p+S-e^2S);
+    Q = 2p^2P/(a^2(2p+S-e^2S));
+    r1 = p/(1-e);
+    r2 = p/(1+e);
+    r3 = (S+Sqrt[S^2-4P])/2;
+    r4 = (S-Sqrt[S^2-4P])/2;
+    kr = (r1-r2)/(r1-r3)(r3-r4)/(r2-r4);
+    k\[Theta] = (1-EnSquared)a^2/Q;
+    factor1 = Sqrt[(r1-r3)(r2-r4)2(1-e^2)a^2/(2p^2P)];
+    r\[Theta]Ratio = factor1 EllipticK[k\[Theta]]/EllipticK[kr];
+    
+    rPlus = 1+Sqrt[1-a^2];
+    rMinus = 1-Sqrt[1-a^2];
+    hr = (r1-r2)/(r1-r3);
+    hPlus = hr (r3-rPlus)/(r2-rPlus);
+    hMinus = hr (r3-rMinus)/(r2-rMinus);
+    factor2 = 2a/(Pi(rPlus-rMinus)Sqrt[(1-EnSquared)(r1-r3)(r2-r4)])2Sqrt[EnSquared];
+    BrPlus = rPlus/(r3-rPlus)(EllipticK[kr]-(r2-r3)/(r2-rPlus)EllipticPi[hPlus, kr]);
+    BrMinus = rMinus/(r3-rMinus)(EllipticK[kr]-(r2-r3)/(r2-rMinus)EllipticPi[hPlus, kr]);
+    Br = factor2(BrPlus-BrMinus);
+    (* {prograde, retrograde} *)
+    {1+Br r\[Theta]Ratio, 1-Br r\[Theta]Ratio}
+];
+
+
+\[Phi]\[Theta]Ratio[a_, p_, e_/;e==1, x_/;x==0]:=
+Module[{S, P, r1, r2, r3, r4, EnSquared, Q, kr, k\[Theta], factor1, factor2, rPlus, rMinus, hPlus, hMinus, hr, BrPlus, BrMinus, Br, r\[Theta]Ratio},
+	(* S=r3+r4, P=r3*r4 *)
+	P = (a^2 (4 a^2 p^2+p^4))/(4 a^2 p^2+(-4+p) p^3);
+	S = (2 p^4)/(4 a^2 p^2 + (-4 + p) p^3);
+	EnSquared = 1;
+    Q = 2p^2P/(a^2 2p);
+    (* r1=p/(1-e) diverges *)
+    r2 = p/2;
+    r3 = (S+Sqrt[S^2-4P])/2;
+    r4 = (S-Sqrt[S^2-4P])/2;
+    kr = (r3-r4)/(r2-r4);
+    k\[Theta] = (1-EnSquared)a^2/Q;
+    factor1 = Sqrt[(2p)(r2-r4)2a^2/(2p^2P)];
+    r\[Theta]Ratio = factor1 EllipticK[k\[Theta]]/EllipticK[kr];
+    
+    rPlus = 1+Sqrt[1-a^2];
+    rMinus = 1-Sqrt[1-a^2];
+    hPlus = (r3-rPlus)/(r2-rPlus);
+    hMinus = (r3-rMinus)/(r2-rMinus);
+    factor2 = 2a/(Pi(rPlus-rMinus)Sqrt[2(r2-r4)])2Sqrt[EnSquared];
+    BrPlus = rPlus/(r3-rPlus)(EllipticK[kr]-(r2-r3)/(r2-rPlus)EllipticPi[hPlus, kr]);
+    BrMinus = rMinus/(r3-rMinus)(EllipticK[kr]-(r2-r3)/(r2-rMinus)EllipticPi[hPlus, kr]);
+    Br = factor2(BrPlus-BrMinus);
+    (* {prograde, retrograde} *)
+    {1+Br r\[Theta]Ratio, 1-Br r\[Theta]Ratio}
+];
+
+
+(* ::Subsubsection::Closed:: *)
+(*Given (a,e,x) and Subscript[\[CapitalOmega], \[Phi]]/Subscript[\[CapitalOmega], \[Theta]]= Subscript[\[Beta], \[Phi]]/Subscript[\[Beta], \[Theta]] find p*)
+
+
+Options[KerrGeoOrbitPhiThetaResonantP]={PrecisionGoal->Automatic};
+
+
+KerrGeoOrbitPhiThetaResonantP[a_?NumericQ, e_?NumericQ, x_?NumericQ, {\[Beta]\[Theta]_Integer, \[Beta]\[Phi]_Integer}, opts:OptionsPattern[]]:=
+Module[{pg,ratio,argpg,resonantEqn,pStar,pp,pgTest},
+	(*See if the user specified some precision goal *)
+	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidXQ[x]||Not@ValidResIntQ[0,\[Beta]\[Theta],\[Beta]\[Phi]],Abort[]];
+	
+	pg=OptionValue[PrecisionGoal];
+	ratio=\[Beta]\[Phi]/\[Beta]\[Theta];
+	If[x>0&&ratio<1, Message[KerrGeoFindResonance::invalidPrograde]; Abort[]];
+	If[x<0&&ratio>1, Message[KerrGeoFindResonance::invalidRetrograde]; Abort[]];
+	(* pStar provides an initial guess for p. Note that p = pStar for e = 0*)
+	pStar=(2 a/Abs[ratio-1])^(2/3);
+
+	(* Resonant condition defined by the equation below *)
+	If[x==0,
+		If[ratio>1,
+			resonantEqn[p_?NumericQ]:= \[Phi]\[Theta]Ratio[a, p, e, x][[1]]-Abs[ratio],
+			resonantEqn[p_?NumericQ]:= \[Phi]\[Theta]Ratio[a, p, e, x][[2]]-Abs[ratio]
+		],
+		resonantEqn[p_?NumericQ]:= \[Phi]\[Theta]Ratio[a, p, e, x]-Abs[ratio]
+	];
+	
+	(* Working precision of the root-finding method is based on the precision specified
+	 by the PrecisionGoal option, or the precision of the arguments. MachinePrecision
+	 is the default precision if not other precision specifications are made. *)
+	argpg=Precision[{resonantEqn[pStar],a,e,x,ratio}];
+	If[argpg==$MachinePrecision,pg=argpg];
+	If[(Not@NumericQ[pg]||pg>argpg),pg=argpg];
+	If[pg==Infinity,pg=$MachinePrecision];
+	
+	If[pg==$MachinePrecision,
+		Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar}]],
+		Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar},PrecisionGoal->pg,WorkingPrecision->pg]],
+		Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar},PrecisionGoal->pg,WorkingPrecision->pg]]
+	]
+];
+
+
+(* ::Subsubsection::Closed:: *)
+(*Given (a,p,x) and Subscript[\[CapitalOmega], \[Phi]]/Subscript[\[CapitalOmega], \[Theta]]= Subscript[\[Beta], \[Phi]]/Subscript[\[Beta], \[Theta]] find e*)
+
+
+Options[KerrGeoOrbitPhiThetaResonantE]={PrecisionGoal->Automatic};
+
+
+KerrGeoOrbitPhiThetaResonantE[a_?NumericQ, p_?NumericQ, x_?NumericQ, {\[Beta]\[Theta]_Integer, \[Beta]\[Phi]_Integer}, opts:OptionsPattern[]]:=
+Module[{pg,argpg,resonantEqn,e0Test,e1Test,eGuess,ee,ratio},
+	(*See if the user specified some precision goal *)
+	If[Not@ValidAQ[a]||Not@ValidXQ[x]||Not@ValidResIntQ[0,\[Beta]\[Theta],\[Beta]\[Phi]],Abort[]];
+	
+	pg=OptionValue[PrecisionGoal];
+	ratio=\[Beta]\[Phi]/\[Beta]\[Theta];
+	If[x>0&&ratio<1, Message[KerrGeoFindResonance::invalidPrograde]; Abort[]];
+	If[x<0&&ratio>1, Message[KerrGeoFindResonance::invalidRetrograde]; Abort[]];
+	
+	(* Test to see if there is an eccentricity that will lead to a bound orbital resonance 
+	 based on the provided values of a, p, x *)
+	e0Test=KerrGeoOrbitPhiThetaResonantP[a,0,x,{\[Beta]\[Theta],\[Beta]\[Phi]},opts];
+	e1Test=KerrGeoOrbitPhiThetaResonantP[a,1,x,{\[Beta]\[Theta],\[Beta]\[Phi]},opts];
+	If[p<e0Test||e1Test<p, Message[KerrGeoFindResonance::noresonance, e0Test, e1Test]; Abort[];];
+	If[p==e0Test,Return[0]];
+	If[p==e1Test,Return[1]];
+	eGuess=(p-e0Test)/(e1Test-e0Test);
+
+	(* Resonant condition defined by the equation below *)
+	If[x==0,
+		If[ratio>1,
+			resonantEqn[e_?NumericQ]:= \[Phi]\[Theta]Ratio[a, p, e, x][[1]]-Abs[ratio],
+			resonantEqn[e_?NumericQ]:= \[Phi]\[Theta]Ratio[a, p, e, x][[2]]-Abs[ratio]
+		],
+		resonantEqn[e_?NumericQ]:= \[Phi]\[Theta]Ratio[a, p, e, x]-Abs[ratio]
+	];
+	
+	(* Working precision of the root-finding method is based on the precision specified
+	 by the PrecisionGoal option, or the precision of the arguments. MachinePrecision
+	 is the default precision if not other precision specifications are made. *)
+	argpg=Precision[{resonantEqn[eGuess],a,p,x,ratio}];
+	If[argpg==$MachinePrecision,pg=argpg];
+	If[(Not@NumericQ[pg]||pg>argpg),pg=argpg];
+	If[pg==Infinity,pg=$MachinePrecision];
+
+	If[pg==$MachinePrecision,
+		Re[ee/.FindRoot[resonantEqn[ee],{ee,eGuess}]],
+		Re[ee/.FindRoot[resonantEqn[ee],{ee,eGuess},PrecisionGoal->pg,WorkingPrecision->pg]],
+		Re[ee/.FindRoot[resonantEqn[ee],{ee,eGuess},PrecisionGoal->pg,WorkingPrecision->pg]]
+	]
+];
+
+
+(* ::Subsubsection::Closed:: *)
+(*Given (a,p,e) and Subscript[\[CapitalOmega], \[Theta]]/Subscript[\[CapitalOmega], \[Phi]]= Subscript[\[Beta], \[Theta]]/Subscript[\[Beta], \[Phi]] find x*)
+
+
+Options[KerrGeoOrbitPhiThetaResonantX]={PrecisionGoal->Automatic};
+
+
+KerrGeoOrbitPhiThetaResonantX[a_?NumericQ, p_?NumericQ, e_?NumericQ, {\[Beta]\[Theta]_Integer, \[Beta]\[Phi]_Integer}, opts:OptionsPattern[]]:=
+Module[{pg,argpg,resonantEqn,x0Test, x1Test,xGuess,xx,ratio},
+	(* Test to see if there is an eccentricity that will lead to a bound orbital resonance 
+	based on the provided values of a, p, x *)
+	(*See if the user specified some precision goal *)
+	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidResIntQ[0,\[Beta]\[Theta],\[Beta]\[Phi]],Abort[]];
+
+	pg=OptionValue[PrecisionGoal];
+	ratio=\[Beta]\[Phi]/\[Beta]\[Theta];
+	(* Test to see if there is an inclination angle that will lead to a bound orbital resonance 
+	 based on the provided values of a, p, e *)
+	x0Test=KerrGeoOrbitPhiThetaResonantP[a,e,0,{\[Beta]\[Theta],\[Beta]\[Phi]},opts];
+	x1Test=KerrGeoOrbitPhiThetaResonantP[a,e,Sign[ratio],{\[Beta]\[Theta],\[Beta]\[Phi]},opts];
+	
+	If[ratio>1 && (p<x1Test||x0Test<p), Message[KerrGeoFindResonance::noresonance, x1Test, x0Test]; Abort[];];
+	If[ratio<1 && (p<x0Test||x1Test<p), Message[KerrGeoFindResonance::noresonance, x0Test, x1Test]; Abort[];];
+	If[p==x0Test,Return[0]];
+	If[p==x1Test,Return[Sign[ratio]]];
+	xGuess=Sign[ratio](p-x0Test)/(x1Test-x0Test);
+
+	(* Resonant condition defined by the equation below *)
+	resonantEqn[x_?NumericQ]:=\[Phi]\[Theta]Ratio[a, p, e, x]-Abs[ratio];
+	
+	(* Working precision of the root-finding method is based on the precision specified
+	 by the PrecisionGoal option, or the precision of the arguments. MachinePrecision
+	 is the default precision if not other precision specifications are made. *)
+	argpg=Precision[{a,p,e,ratio}];
+	If[argpg==$MachinePrecision,pg=0.9argpg];
+	If[(Not@NumericQ[pg]||pg>argpg),pg=0.9argpg];
+	If[pg==Infinity,pg=$MachinePrecision];
+
+	If[pg==$MachinePrecision,
+		Re[xx/.FindRoot[resonantEqn[xx],{xx,xGuess}]],
+		Re[xx/.FindRoot[resonantEqn[xx],{xx,xGuess},PrecisionGoal->pg,WorkingPrecision->0.95argpg]],
+		Re[xx/.FindRoot[resonantEqn[xx],{xx,xGuess},PrecisionGoal->pg,WorkingPrecision->0.95argpg]]
+	]
+];
+
+
+(* ::Subsection::Closed:: *)
+(*r\[Theta]\[Phi]-resonance*)
+
+
+(* ::Subsubsection::Closed:: *)
+(*Testing functions*)
+
+
+(* ::Text:: *)
+(*Same as those of r\[Theta]-resonance*)
+
+
+(* ::Subsubsection::Closed:: *)
+(*Useful functions for root-finding*)
+
+
+(* ::Text:: *)
+(*Use those of double resonances*)
+
+
+(* ::Subsubsection:: *)
+(*Given (a,e,\[Beta]r,\[Beta]\[Theta]) find (\[Beta]rmin, \[Beta]rmax)*)
+
+
+Options[KerrGeoOrbitTripleResonant\[Beta]r]={PrecisionGoal->Automatic};
+
+
+KerrGeoOrbitTripleResonant\[Beta]r[a_?NumericQ, e_?NumericQ, {\[Beta]\[Theta]_Integer, \[Beta]\[Phi]_Integer}, opts:OptionsPattern[]]:=
+Module[{pg,argpg,resonantEqnr\[Theta],resonantEqnr\[Phi],p0Test,p1Test,r\[Theta]ratio0,r\[Theta]ratio1,\[Phi]\[Theta]ratio},
+	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidXQ[x]||Not@ValidResIntQ[0,\[Beta]\[Theta],\[Beta]\[Phi]],Abort[]];
+	\[Phi]\[Theta]ratio=\[Beta]\[Phi]/\[Beta]\[Theta];
+	p0Test=KerrGeoOrbitPhiThetaResonantP[a, e, 0, {\[Beta]\[Theta], \[Beta]\[Phi]}, opts];
+	p1Test=KerrGeoOrbitPhiThetaResonantP[a, e, Sign[\[Beta]\[Theta]], {\[Beta]\[Theta], \[Beta]\[Phi]}, opts];
+	r\[Theta]ratio0=Sign[\[Beta]\[Theta]]r\[Theta]Ratio[a, p0Test, e, 0];
+	r\[Theta]ratio1=Sign[\[Beta]\[Theta]]r\[Theta]Ratio[a, p1Test, e, Sign[\[Beta]\[Theta]]];
+	Sort[{\[Beta]\[Theta] r\[Theta]ratio0, \[Beta]\[Theta] r\[Theta]ratio1}, Less]
+];
+
+
+(* ::Subsubsection::Closed:: *)
+(*Given (a,e,\[Beta]r,\[Beta]\[Phi]) find (\[Beta]\[Theta]min, \[Beta]\[Theta]max)*)
+
+
+Options[KerrGeoOrbitTripleResonant\[Beta]\[Theta]]={PrecisionGoal->Automatic};
+
+
+KerrGeoOrbitTripleResonant\[Beta]\[Theta][a_?NumericQ, e_?NumericQ, {\[Beta]r_Integer, \[Beta]\[Phi]_Integer}, opts:OptionsPattern[]]:=
+Module[{pg,argpg,resonantEqnr\[Theta],resonantEqnr\[Phi],p0Test,p1Test,r\[Theta]ratio0,r\[Theta]ratio1,r\[Phi]ratio},
+	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidXQ[x]||Not@ValidResIntQ[\[Beta]r,0,\[Beta]\[Phi]],Abort[]];
+	r\[Phi]ratio=\[Beta]r/\[Beta]\[Phi];
+	p0Test=KerrGeoOrbitRPhiResonantP[a, e, 0, {\[Beta]r, \[Beta]\[Phi]}, opts];
+	p1Test=KerrGeoOrbitRPhiResonantP[a, e, Sign[r\[Phi]ratio], {\[Beta]r, \[Beta]\[Phi]}, opts];
+	r\[Theta]ratio0=Sign[r\[Phi]ratio]r\[Theta]Ratio[a, p0Test, e, 0];
+	r\[Theta]ratio1=Sign[r\[Phi]ratio]r\[Theta]Ratio[a, p1Test, e, Sign[r\[Phi]ratio]];
+	Sort[{\[Beta]r/r\[Theta]ratio0, \[Beta]r/r\[Theta]ratio1}, Less]
+];
+
+
+(* ::Subsubsection::Closed:: *)
+(*Given (a,e,\[Beta]r,\[Beta]\[Theta]) find (\[Beta]\[Phi]min, \[Beta]\[Phi]max)*)
+
+
+Options[KerrGeoOrbitTripleResonant\[Beta]\[Phi]]={PrecisionGoal->Automatic};
+
+
+KerrGeoOrbitTripleResonant\[Beta]\[Phi][a_?NumericQ, e_?NumericQ, {\[Beta]r_Integer, \[Beta]\[Theta]_Integer}, opts:OptionsPattern[]]:=
+Module[{pg,argpg,resonantEqnr\[Theta],resonantEqnr\[Phi],p0Test,p1Test,r\[Phi]ratio0,r\[Phi]ratio1,r\[Theta]ratio},
+	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidXQ[x]||Not@ValidResIntQ[\[Beta]r,\[Beta]\[Theta],0],Abort[]];
+	r\[Theta]ratio=\[Beta]r/\[Beta]\[Theta];
+	p0Test=KerrGeoOrbitRThetaResonantP[a, e, 0, {\[Beta]r, \[Beta]\[Theta]}, opts];
+	p1Test=KerrGeoOrbitRThetaResonantP[a, e, Sign[r\[Theta]ratio], {\[Beta]r, \[Beta]\[Theta]}, opts];
+	r\[Phi]ratio0=Sign[r\[Theta]ratio]If[r\[Theta]ratio>0, r\[Phi]Ratio[a, p0Test, e, 0][[1]], r\[Phi]Ratio[a, p0Test, e, 0][[2]]];
+	r\[Phi]ratio1=Sign[r\[Theta]ratio]r\[Phi]Ratio[a, p1Test, e, Sign[r\[Theta]ratio]];
+	Sort[{\[Beta]r/r\[Phi]ratio0, \[Beta]r/r\[Phi]ratio1}, Less]
+];
+
+
+(* ::Subsubsection::Closed:: *)
+(*Given (a,e,\[Beta]r,\[Beta]\[Theta],\[Beta]\[Phi]) find (p, x)*)
+
+
+Options[KerrGeoOrbitTripleResonantPX]={PrecisionGoal->Automatic};
+
+
+KerrGeoOrbitTripleResonantPX[a_?NumericQ, e_?NumericQ, {\[Beta]r_Integer, \[Beta]\[Theta]_Integer, \[Beta]\[Phi]_Integer}, opts:OptionsPattern[]]:=
+Module[{pg,argpg,resonantEqnr\[Theta],resonantEqnr\[Phi],pGuess,xGuess,pp,xx,r\[Theta]ratio,r\[Phi]ratio,p0r\[Theta]Test,p1r\[Theta]Test,p0r\[Phi]Test,p1r\[Phi]Test,p0\[Phi]\[Theta]Test,p1\[Phi]\[Theta]Test,checkSolution, rInts, \[Theta]Ints, \[Phi]Ints},
+	(*See if the user specified some precision goal *)
+	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidXQ[x]||Not@ValidResIntQ[0,\[Beta]\[Theta],\[Beta]\[Phi]],Abort[]];
+	
+	pg=OptionValue[PrecisionGoal];
+	r\[Theta]ratio=\[Beta]r/\[Beta]\[Theta];
+	r\[Phi]ratio=\[Beta]r/\[Beta]\[Phi];
+	p0r\[Theta]Test=KerrGeoOrbitRThetaResonantP[a, e, 0, {\[Beta]r, \[Beta]\[Theta]},opts];
+	p1r\[Theta]Test=KerrGeoOrbitRThetaResonantP[a, e, Sign[r\[Theta]ratio], {\[Beta]r, \[Beta]\[Theta]},opts];
+	p0r\[Phi]Test=KerrGeoOrbitRPhiResonantP[a, e, 0, {\[Beta]r, \[Beta]\[Phi]},opts];
+	p1r\[Phi]Test=KerrGeoOrbitRPhiResonantP[a, e, Sign[r\[Phi]ratio], {\[Beta]r, \[Beta]\[Phi]},opts];
+	checkSolution=(p0r\[Theta]Test-p0r\[Phi]Test)(p1r\[Theta]Test-p1r\[Phi]Test);
+	If[checkSolution>0,
+		rInts=KerrGeoOrbitTripleResonant\[Beta]r[a, e, {\[Beta]\[Theta], \[Beta]\[Phi]}, opts];
+		\[Theta]Ints=KerrGeoOrbitTripleResonant\[Beta]\[Theta][a, e, {\[Beta]r, \[Beta]\[Phi]}, opts];
+		\[Phi]Ints=KerrGeoOrbitTripleResonant\[Beta]\[Phi][a, e, {\[Beta]r, \[Beta]\[Theta]}, opts];
+		Message[KerrGeoFindResonance::noTripleResonance,rInts[[1]],rInts[[2]],\[Theta]Ints[[1]],\[Theta]Ints[[2]],\[Phi]Ints[[1]],\[Phi]Ints[[2]]];
+		Abort[]];
+	
+	xGuess=Sign[r\[Theta]ratio]/((p1r\[Phi]Test-p1r\[Theta]Test)/(p0r\[Theta]Test-p0r\[Phi]Test)+1);
+	pGuess=p0r\[Theta]Test-Sign[r\[Theta]ratio]xGuess(p0r\[Theta]Test-p1r\[Theta]Test);
+	resonantEqnr\[Theta][p_?NumericQ, x_?NumericQ]:=r\[Theta]Ratio[a, p, e, x]-Abs[r\[Theta]ratio];
+	resonantEqnr\[Phi][p_?NumericQ, x_?NumericQ]:=r\[Phi]Ratio[a, p, e, x]-Abs[r\[Phi]ratio];
+	argpg=Precision[{a,e,r\[Theta]ratio,r\[Phi]ratio,resonantEqnr\[Theta][pGuess, xGuess],resonantEqnr\[Phi][pGuess, xGuess]}];
+	If[argpg==$MachinePrecision,pg=0.9argpg];
+	If[(Not@NumericQ[pg]||pg>argpg),pg=0.9argpg];
+	If[pg==Infinity,pg=$MachinePrecision];
+	If[pg==$MachinePrecision,
+		Re[{pp,xx}/.FindRoot[{resonantEqnr\[Theta][pp,xx],resonantEqnr\[Phi][pp,xx]},{{pp,pGuess},{xx,xGuess}}]],
+		Re[{pp,xx}/.FindRoot[{resonantEqnr\[Theta][pp,xx],resonantEqnr\[Phi][pp,xx]},{{pp,pGuess},{xx,xGuess}},PrecisionGoal->pg,WorkingPrecision->0.95argpg]],
+		Re[{pp,xx}/.FindRoot[{resonantEqnr\[Theta][pp,xx],resonantEqnr\[Phi][pp,xx]},{{pp,pGuess},{xx,xGuess}},PrecisionGoal->pg,WorkingPrecision->0.95argpg]]
+	]
+];
+
+
+(* ::Subsection::Closed:: *)
 (*Generic resonance interface*)
 
 
-Options[KerrGeoFindResonance]={PrecisionGoal->Automatic, Rotation->"Both"};
+Options[KerrGeoFindResonance]={PrecisionGoal->Automatic};
 
 
-KerrGeoFindResonance[assoc_Association,{\[Beta]r_Integer, \[Beta]\[Theta]_Integer, \[Beta]\[Phi]_Integer},opts:OptionsPattern[]]:= Module[{},Message[KerrGeoFindResonance::missing]; Return[$Failed]];
+KerrGeoFindResonance[assoc_Association,{\[Beta]r_Integer, \[Beta]\[Theta]_Integer, \[Beta]\[Phi]_Integer},opts:OptionsPattern[]]:=Module[{pp, xx},
+	If[ContainsExactly[Keys[assoc],{"a","e"}],
+		{pp, xx}=KerrGeoOrbitTripleResonantPX["a"/.assoc, "e"/.assoc, {\[Beta]r, \[Beta]\[Theta], \[Beta]\[Phi]}, opts];
+		{"p"->pp,"x"->xx},
+		Message[KerrGeoFindResonance::assocErrTriple]
+	]
+]
 
 KerrGeoFindResonance[assoc_Association,{\[Beta]r_Integer, \[Beta]\[Theta]_Integer, 0},opts:OptionsPattern[]]:=Block[{},
 	If[ContainsExactly[Keys[assoc],{"a","p","x"}],
@@ -977,6 +1187,19 @@ KerrGeoFindResonance[assoc_Association,{\[Beta]r_Integer, 0, \[Beta]\[Phi]_Integ
 			"p"->KerrGeoOrbitRPhiResonantP["a"/.assoc, "e"/.assoc, "x"/.assoc, {\[Beta]r, \[Beta]\[Phi]}, opts],
 			If[ContainsExactly[Keys[assoc],{"a","p","e"}],
 				"x"->KerrGeoOrbitRPhiResonantX["a"/.assoc, "p"/.assoc, "e"/.assoc, {\[Beta]r, \[Beta]\[Phi]}, opts],
+				Message[KerrGeoFindResonance::assocErr]
+			]
+		]
+	]
+]
+
+KerrGeoFindResonance[assoc_Association,{0, \[Beta]\[Theta]_Integer, \[Beta]\[Phi]_Integer},opts:OptionsPattern[]]:=Block[{},
+	If[ContainsExactly[Keys[assoc],{"a","p","x"}],
+		"e"->KerrGeoOrbitPhiThetaResonantE["a"/.assoc, "p"/.assoc, "x"/.assoc, {\[Beta]\[Theta], \[Beta]\[Phi]}, opts],
+		If[ContainsExactly[Keys[assoc],{"a","e","x"}],
+			"p"->KerrGeoOrbitPhiThetaResonantP["a"/.assoc, "e"/.assoc, "x"/.assoc, {\[Beta]\[Theta], \[Beta]\[Phi]}, opts],
+			If[ContainsExactly[Keys[assoc],{"a","p","e"}],
+				"x"->KerrGeoOrbitPhiThetaResonantX["a"/.assoc, "p"/.assoc, "e"/.assoc, {\[Beta]\[Theta], \[Beta]\[Phi]}, opts],
 				Message[KerrGeoFindResonance::assocErr]
 			]
 		]
