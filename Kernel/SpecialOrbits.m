@@ -668,7 +668,7 @@ Module[{S, P, r1, r2, r3, r4, EnSquared, Q, kr, k\[Theta], factor1, factor2, rPl
 ];
 
 
-(* ::Subsubsection::Closed:: *)
+(* ::Subsubsection:: *)
 (*Given (a,e,x) and Subscript[\[CapitalOmega], r]/Subscript[\[CapitalOmega], \[Phi]]= Subscript[\[Beta], r]/Subscript[\[Beta], \[Phi]] find p*)
 
 
@@ -705,7 +705,7 @@ Module[{pg,ratio,argpg,resonantEqn,pStar,pp,pgTest},
 	If[pg==Infinity,pg=$MachinePrecision];
 	
 	If[pg==$MachinePrecision,
-		Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar},StepMonitor:>Print[pp]]],
+		Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar}]],
 		Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar},PrecisionGoal->pg,WorkingPrecision->pg]],
 		Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar},PrecisionGoal->pg,WorkingPrecision->pg]]
 	]
@@ -826,7 +826,7 @@ Module[{pg,rtt,argpg,resonantEqn,x0Test, x1Test, x0Test1,x0Test2,x1Test1,x1Test2
 (*Same as those of r\[Theta]-resonance*)
 
 
-(* ::Subsubsection:: *)
+(* ::Subsubsection::Closed:: *)
 (*Useful functions for root-finding*)
 
 
