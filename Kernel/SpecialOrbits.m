@@ -8,7 +8,7 @@
 (*Define usage for public functions*)
 
 
-(* ::Section::Closed:: *)
+(* ::Section:: *)
 (*Create Package*)
 
 
@@ -42,7 +42,7 @@ KerrGeoPlungeOrbitQ::usage = "KerrGeoPlungeOrbitQ[a,p,e,x] tests if the orbital 
 
 
 KerrGeoFindResonance::noresonance = "Resonant orbits only occur for semi-latus rectum in range `1` \[LessEqual] p \[LessEqual] `2`"
-KerrGeoFindResonance::noTripleResonance = "Triple Resonant orbits occur for `1` \[LessEqual] r-integer \[LessEqual] `2`, `3` \[LessEqual] \[Theta]-integer \[LessEqual] `4` or `5` \[LessEqual] \[Phi]-integer \[LessEqual] `6`"
+KerrGeoFindResonance::noTripleResonance = "No triple resonance; try `1` \[LessEqual] r-integer \[LessEqual] `2`, `3` \[LessEqual] \[Theta]-integer \[LessEqual] `4` or `5` \[LessEqual] \[Phi]-integer \[LessEqual] `6`"
 KerrGeoFindResonance::invalida = "Invalid black hole spin parameter. Choose 0 < a \[LessEqual] 1."
 KerrGeoFindResonance::invalide = "Invalid orbital eccentricity. Choose 0 \[LessEqual] e \[LessEqual] 1."
 KerrGeoFindResonance::invalidx = "Invalid orbital inclination. Choose 0 \[LessEqual] |x| \[LessEqual] 1."
@@ -52,6 +52,7 @@ KerrGeoFindResonance::assocErrTriple = "Only support association {a, e} for inpu
 KerrGeoFindResonance::missing = "Resonaces involving the \[Phi] frequency are not yet implemented"
 KerrGeoFindResonance::invalidPrograde = "Invalid prograde resonant integers. Choose \[Beta]r/\[Beta]\[Phi] > 0, \[Beta]r/\[Beta]\[Phi] > 0 and \[Beta]\[Theta] < \[Beta]\[Phi]"
 KerrGeoFindResonance::invalidRetrograde = "Invalid retrograde resonant integers. Choose \[Beta]r/\[Beta]\[Phi] < 0, \[Beta]r/\[Beta]\[Phi] < 0 and \[Beta]\[Theta] > \[Beta]\[Phi]"  
+KerrGeoFindResonance::closeSeparatrix = "No resonance or the exact result is too close to the separatrix, the value is set to the separatrix+10^(-5) instead"
 
 
 (* ::Subsection::Closed:: *)
@@ -345,6 +346,27 @@ KerrGeoOrbitType[a_?NumericQ, p_?NumericQ, e_?NumericQ, x_?NumericQ]:=Module[{ou
 
 
 (* ::Subsection:: *)
+(*Resonance solver*)
+
+
+Options[ResonanceSolver]={PrecisionGoal->Automatic};
+
+
+ResonanceSolver[f_, {p_, p0_?NumericQ, pSep_?NumericQ}, opts:OptionsPattern[]]:=
+Module[{pp},
+If[p0<pSep,
+	Quiet[Check[Return[p/.FindRoot[f[p], {p, pSep+10^(-5), pSep, Infinity}]],{}]];
+	Message[KerrGeoFindResonance::closeSeparatrix];
+	Return[pSep+10^(-5)];
+];
+Quiet[Check[Return[p/.FindRoot[f[p], {p, p0, pSep, Infinity}]],{}]];
+Quiet[Check[Return[p/.FindRoot[f[p], {p, pSep+10^(-5), pSep, Infinity}]],{}]];
+Message[KerrGeoFindResonance::closeSeparatrix];
+Return[pSep+10^(-5)];
+];
+
+
+(* ::Subsection::Closed:: *)
 (*r\[Theta]-resonances*)
 
 
@@ -433,16 +455,16 @@ y1y2[0,p_,e_,x_/;x^2<1]:=y1y2[0,p,e,1];
 
 \[Pi]x[a_,p_,e_,x_/;x>=0]:=(a^2*(1 - x^2)*((-4 + p)*p^7 + a^8*(-1 + e^2)^4*(-1 + x^2)^2 + 2*a^6*(-1 + e^2)^2*p*(1 - x^2)*((1 + e^2)*p + (-2 + p + e^2*(2 + p))*(1 - x^2)) + 
    a^4*p^3*((-3 + 2*e^2 + e^4)*p + 4*(-4 + 3*p + e^4*(4 + p))*(1 - x^2) + (-1 + e^2)*(-4 + e^2*(-12 + p) + 3*p)*(-1 + x^2)^2) + 
-   2*a^2*p^2*((-1 - e^2)*p^4*(-2 + x^2) + 8*(-1 + e^2)*p^2*(-1 + x^2) + 2*p^3*(-3 - e^2 + 4*(1 + e^2)*x^2) + 
-     4*(-1 + x^2)*Sqrt[-(((a^4*(-1 + e^2)^2 + (-4*e^2 + (-2 + p)^2)*p^2 + 2*a^2*p*(-2 + p + e^2*(2 + p)))*x^2*(-p^2 + a^2*(-1 + e)^2*(-1 + x^2))*(-p^2 + a^2*(1 + e)^2*(-1 + x^2))*
-          (-p^2 + a^2*(-1 + e^2)*(-1 + x^2)))/(a^2*p*(-1 + x^2)^2))])))/((-4 + p)^2*p^6 + a^8*(-1 + e^2)^4*(-1 + x^2)^2 + 2*a^2*p^5*((-1 + e^2)*(4 + p) + (-4 + e^2*(-12 + p) + 3*p)*(1 - x^2)) + 
+   2*a^2*p^2*((-1 - e^2)*p^4*(-2 + x^2) + 8*(-1 + e^2)*p^2*(-1 + x^2) + 2*p^3*(-3 - e^2 + 4*(1 + e^2)*x^2) - 
+     4*Sqrt[-1/(a^2*p)(((a^4*(-1 + e^2)^2 + (-4*e^2 + (-2 + p)^2)*p^2 + 2*a^2*p*(-2 + p + e^2*(2 + p)))*x^2*(-p^2 + a^2*(-1 + e)^2*(-1 + x^2))*(-p^2 + a^2*(1 + e)^2*(-1 + x^2))*
+          (-p^2 + a^2*(-1 + e^2)*(-1 + x^2))))])))/((-4 + p)^2*p^6 + a^8*(-1 + e^2)^4*(-1 + x^2)^2 + 2*a^2*p^5*((-1 + e^2)*(4 + p) + (-4 + e^2*(-12 + p) + 3*p)*(1 - x^2)) + 
   2*a^6*(-1 + e^2)^2*p^2*(-1 + x^2)*(-2 + 3*x^2 + e^2*(-2 + x^2)) + a^4*p^3*(-8*(-1 + e^2)^2*(1 - 3*x^2 + 2*x^4) + p*((-1 + e^2)^2 - 4*(-1 + e^4)*(-1 + x^2) + (3 + e^2)^2*(-1 + x^2)^2)));
 
 \[Pi]x[a_,p_,e_,x_/;x<0]:=(a^2*(1 - x^2)*((-4 + p)*p^7 + a^8*(-1 + e^2)^4*(-1 + x^2)^2 + 2*a^6*(-1 + e^2)^2*p*(1 - x^2)*((1 + e^2)*p + (-2 + p + e^2*(2 + p))*(1 - x^2)) + 
    a^4*p^3*((-3 + 2*e^2 + e^4)*p + 4*(-4 + 3*p + e^4*(4 + p))*(1 - x^2) + (-1 + e^2)*(-4 + e^2*(-12 + p) + 3*p)*(-1 + x^2)^2) + 
-   2*a^2*p^2*(-((1 + e^2)*p^4*(-2 + x^2)) + 8*(-1 + e^2)*p^2*(-1 + x^2) + 2*p^3*(-3 - e^2 + 4*(1 + e^2)*x^2) - 
-     4*(-1 + x^2)*Sqrt[-(((a^4*(-1 + e^2)^2 + (-4*e^2 + (-2 + p)^2)*p^2 + 2*a^2*p*(-2 + p + e^2*(2 + p)))*x^2*(-p^2 + a^2*(-1 + e)^2*(-1 + x^2))*(-p^2 + a^2*(1 + e)^2*(-1 + x^2))*
-          (-p^2 + a^2*(-1 + e^2)*(-1 + x^2)))/(a^2*p*(-1 + x^2)^2))])))/((-4 + p)^2*p^6 + a^8*(-1 + e^2)^4*(-1 + x^2)^2 + 2*a^2*p^5*((-1 + e^2)*(4 + p) + (-4 + e^2*(-12 + p) + 3*p)*(1 - x^2)) + 
+   2*a^2*p^2*(-((1 + e^2)*p^4*(-2 + x^2)) + 8*(-1 + e^2)*p^2*(-1 + x^2) + 2*p^3*(-3 - e^2 + 4*(1 + e^2)*x^2) + 
+     4*Sqrt[-1/(a^2*p)(((a^4*(-1 + e^2)^2 + (-4*e^2 + (-2 + p)^2)*p^2 + 2*a^2*p*(-2 + p + e^2*(2 + p)))*x^2*(-p^2 + a^2*(-1 + e)^2*(-1 + x^2))*(-p^2 + a^2*(1 + e)^2*(-1 + x^2))*
+          (-p^2 + a^2*(-1 + e^2)*(-1 + x^2))))])))/((-4 + p)^2*p^6 + a^8*(-1 + e^2)^4*(-1 + x^2)^2 + 2*a^2*p^5*((-1 + e^2)*(4 + p) + (-4 + e^2*(-12 + p) + 3*p)*(1 - x^2)) + 
   2*a^6*(-1 + e^2)^2*p^2*(-1 + x^2)*(-2 + 3*x^2 + e^2*(-2 + x^2)) + a^4*p^3*(-8*(-1 + e^2)^2*(1 - 3*x^2 + 2*x^4) + p*((-1 + e^2)^2 - 4*(-1 + e^4)*(-1 + x^2) + (3 + e^2)^2*(-1 + x^2)^2)));
 
 
@@ -482,7 +504,8 @@ Module[{pg,ratio,argpg,resonantEqn,pStar,pp,pgTest,pSep},
 	If[x<0&&ratio>0, Message[KerrGeoFindResonance::invalidRetrograde]; Abort[]];
 	(* pStar provides an initial guess for p. Note that p = pStar for e = 0 and a = 0*)
 	pStar=6/(1-ratio^2); (* See Eq 30 *)
-
+	pSep=KerrGeoSeparatrix[a,e,x];
+	
 	(* Resonant condition defined by the equation below *)
 	resonantEqn[p_?NumericQ]:=r\[Theta]Ratio[a, p, e, x]-Abs[ratio];
 	
@@ -493,11 +516,11 @@ Module[{pg,ratio,argpg,resonantEqn,pStar,pp,pgTest,pSep},
 	If[argpg==$MachinePrecision,pg=argpg];
 	If[(Not@NumericQ[pg]||pg>argpg),pg=argpg];
 	If[pg==Infinity,pg=$MachinePrecision];
-
+	
 	If[pg==$MachinePrecision,
-		Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar}]],
-		Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar},PrecisionGoal->pg,WorkingPrecision->pg]],
-		Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar},PrecisionGoal->pg,WorkingPrecision->pg]]
+		ResonanceSolver[resonantEqn,{pp, pStar, pSep}],
+		ResonanceSolver[resonantEqn,{pp, pStar, pSep, PrecisionGoal->pg, WorkingPrecision->pg}],
+		ResonanceSolver[resonantEqn,{pp, pStar, pSep, PrecisionGoal->pg, WorkingPrecision->pg}]
 	]
 ];
 
@@ -590,7 +613,7 @@ Module[{pg,argpg,resonantEqn,x0Test,x1Test,xGuess,xx,xxx,ratio},
 ];
 
 
-(* ::Subsection:: *)
+(* ::Subsection::Closed:: *)
 (*r\[Phi]-resonances*)
 
 
@@ -602,73 +625,61 @@ Module[{pg,argpg,resonantEqn,x0Test,x1Test,xGuess,xx,xxx,ratio},
 (*Same as those of r\[Theta]-resonance*)
 
 
-(* ::Subsubsection:: *)
+(* ::Subsubsection::Closed:: *)
 (*Useful functions for root-finding*)
 
 
-r\[Phi]Ratio[a_, p_, e_, x_/;x!=0]:= Sign[x] ("\!\(\*SubscriptBox[\(\[CapitalUpsilon]\), \(r\)]\)")/("\!\(\*SubscriptBox[\(\[CapitalUpsilon]\), \(\[Phi]\)]\)")/.KerrGeoFrequencies[a, p, e, x, Time->"Mino"]
+En2[a_, p_, e_/;e<1, x_]:=1-(2(1-e^2))/(2p+(1-e^2)\[Pi]p[a,p,e,x]);
+En2[a_,p_,1, x_]:=1;
+
+L2[a_, p_, e_, x_]:=(2 (a^2 (-1+e^2)+p^2) (a^2-\[Pi]x[a,p,e,x])+4 a^2 p \[Pi]p[a,p,e,x])/(a^2 (2 p+(1-e^2)\[Pi]p[a,p,e,x]));
+L2[a_, p_, e_, 0]:=0;
+
+Q[a_, p_, e_, x_/;x^2<1]:=(2 p^2 \[Pi]x[a,p,e,x])/(a^2 (2 p+(1-e^2)\[Pi]p[a,p,e,x]));
+Q[a_, p_, e_, x_/;x^2==1]:=0;
+
+r3[a_, p_, e_, x_/;x^2<1]:=(\[Pi]p[a,p,e,x]+Sqrt[\[Pi]p[a,p,e,x]^2-4 \[Pi]x[a,p,e,x]])/2;
+r3[a_, p_, e_, x_/;x^2==1]:=\[Pi]p[a,p,e,x];
+
+r4[a_, p_, e_, x_/;x^2<1]:=(\[Pi]p[a,p,e,x]-Sqrt[\[Pi]p[a,p,e,x]^2-4 \[Pi]x[a,p,e,x]])/2;
+r4[a_, p_, e_, x_/;x^2==1]:=0;
 
 
-r\[Phi]Ratio[a_, p_, e_/;e<1, x_/;x==0]:=
-Module[{S, P, r1, r2, r3, r4, EnSquared, Q, kr, k\[Theta], factor1, factor2, rPlus, rMinus, hPlus, hMinus, hr, BrPlus, BrMinus, Br, r\[Theta]Ratio},
-	(* S=r3+r4, P=r3*r4 *)
-	P = (a^2(a^4(-1+e^2)2+p^4+2a^2p(-2+p+e^2(2+p))))/(a^4(-1+e^2)^2+2a^2(1+e^2)p^2+(-4+p)p^3);
-	S = (2(a^2(-1+e^2)+p^2)^2)/(a^4(-1+e^2)^2+2a^2(1+e^2)p^2+(-4+p)p^3);
-	EnSquared = 1+2(-1+e^2)/(2p+S-e^2S);
-    Q = 2p^2P/(a^2(2p+S-e^2S));
-    r1 = p/(1-e);
-    r2 = p/(1+e);
-    r3 = (S+Sqrt[S^2-4P])/2;
-    r4 = (S-Sqrt[S^2-4P])/2;
-    kr = Abs[(r1-r2)/(r1-r3)(r3-r4)/(r2-r4)];
-    k\[Theta] = Abs[(1-EnSquared)a^2/Q];
-    factor1 = Sqrt[(r1-r3)(r2-r4)2(1-e^2)a^2/(2p^2P)];
-    r\[Theta]Ratio = factor1 EllipticK[k\[Theta]]/EllipticK[kr];
-    
-    rPlus = 1+Sqrt[1-a^2];
-    rMinus = 1-Sqrt[1-a^2];
-    hr = (r1-r2)/(r1-r3);
-    hPlus = hr (r3-rPlus)/(r2-rPlus);
-    hMinus = hr (r3-rMinus)/(r2-rMinus);
-    factor2 = 2a/(Pi(rPlus-rMinus)Sqrt[(1-EnSquared)(r1-r3)(r2-r4)])2Sqrt[EnSquared];
-    BrPlus = rPlus/(r3-rPlus)(EllipticK[kr]-(r2-r3)/(r2-rPlus)EllipticPi[hPlus, kr]);
-    BrMinus = rMinus/(r3-rMinus)(EllipticK[kr]-(r2-r3)/(r2-rMinus)EllipticPi[hPlus, kr]);
-    Br = factor2(BrPlus-BrMinus);
-    (* {prograde, retrograde} *)
-    {1/(1/r\[Theta]Ratio+Br),-1/(-1/r\[Theta]Ratio+Br)}
-];
+\[Pi]xReduced[a_,p_,e_,x_/;x>=0]:=(a^2*((-4 + p)*p^7 + a^8*(-1 + e^2)^4*(-1 + x^2)^2 + 2*a^6*(-1 + e^2)^2*p*(1 - x^2)*((1 + e^2)*p + (-2 + p + e^2*(2 + p))*(1 - x^2)) + 
+   a^4*p^3*((-3 + 2*e^2 + e^4)*p + 4*(-4 + 3*p + e^4*(4 + p))*(1 - x^2) + (-1 + e^2)*(-4 + e^2*(-12 + p) + 3*p)*(-1 + x^2)^2) + 
+   2*a^2*p^2*((-1 - e^2)*p^4*(-2 + x^2) + 8*(-1 + e^2)*p^2*(-1 + x^2) + 2*p^3*(-3 - e^2 + 4*(1 + e^2)*x^2) - 
+     4*Sqrt[-1/(a^2*p)(((a^4*(-1 + e^2)^2 + (-4*e^2 + (-2 + p)^2)*p^2 + 2*a^2*p*(-2 + p + e^2*(2 + p)))*x^2*(-p^2 + a^2*(-1 + e)^2*(-1 + x^2))*(-p^2 + a^2*(1 + e)^2*(-1 + x^2))*
+          (-p^2 + a^2*(-1 + e^2)*(-1 + x^2))))])))/((-4 + p)^2*p^6 + a^8*(-1 + e^2)^4*(-1 + x^2)^2 + 2*a^2*p^5*((-1 + e^2)*(4 + p) + (-4 + e^2*(-12 + p) + 3*p)*(1 - x^2)) + 
+  2*a^6*(-1 + e^2)^2*p^2*(-1 + x^2)*(-2 + 3*x^2 + e^2*(-2 + x^2)) + a^4*p^3*(-8*(-1 + e^2)^2*(1 - 3*x^2 + 2*x^4) + p*((-1 + e^2)^2 - 4*(-1 + e^4)*(-1 + x^2) + (3 + e^2)^2*(-1 + x^2)^2)));
+\[Pi]xReduced[a_,p_,e_,x_/;x<0]:=(a^2*((-4 + p)*p^7 + a^8*(-1 + e^2)^4*(-1 + x^2)^2 + 2*a^6*(-1 + e^2)^2*p*(1 - x^2)*((1 + e^2)*p + (-2 + p + e^2*(2 + p))*(1 - x^2)) + 
+   a^4*p^3*((-3 + 2*e^2 + e^4)*p + 4*(-4 + 3*p + e^4*(4 + p))*(1 - x^2) + (-1 + e^2)*(-4 + e^2*(-12 + p) + 3*p)*(-1 + x^2)^2) + 
+   2*a^2*p^2*(-((1 + e^2)*p^4*(-2 + x^2)) + 8*(-1 + e^2)*p^2*(-1 + x^2) + 2*p^3*(-3 - e^2 + 4*(1 + e^2)*x^2) + 
+     4*Sqrt[-1/(a^2*p)(((a^4*(-1 + e^2)^2 + (-4*e^2 + (-2 + p)^2)*p^2 + 2*a^2*p*(-2 + p + e^2*(2 + p)))*x^2*(-p^2 + a^2*(-1 + e)^2*(-1 + x^2))*(-p^2 + a^2*(1 + e)^2*(-1 + x^2))*
+          (-p^2 + a^2*(-1 + e^2)*(-1 + x^2))))])))/((-4 + p)^2*p^6 + a^8*(-1 + e^2)^4*(-1 + x^2)^2 + 2*a^2*p^5*((-1 + e^2)*(4 + p) + (-4 + e^2*(-12 + p) + 3*p)*(1 - x^2)) + 
+  2*a^6*(-1 + e^2)^2*p^2*(-1 + x^2)*(-2 + 3*x^2 + e^2*(-2 + x^2)) + a^4*p^3*(-8*(-1 + e^2)^2*(1 - 3*x^2 + 2*x^4) + p*((-1 + e^2)^2 - 4*(-1 + e^4)*(-1 + x^2) + (3 + e^2)^2*(-1 + x^2)^2)));
 
 
-r\[Phi]Ratio[a_, p_, e_/;e==1, x_/;x==0]:=
-Module[{S, P, r1, r2, r3, r4, EnSquared, Q, kr, k\[Theta], factor1, factor2, rPlus, rMinus, hPlus, hMinus, hr, BrPlus, BrMinus, Br, r\[Theta]Ratio},
-	(* S=r3+r4, P=r3*r4 *)
-	P = (a^2 (4 a^2 p^2+p^4))/(4 a^2 p^2+(-4+p) p^3);
-	S = (2 p^4)/(4 a^2 p^2 + (-4 + p) p^3);
-	EnSquared = 1;
-    Q = 2p^2P/(a^2 2p);
-    (* r1=p/(1-e) diverges *)
-    r2 = p/2;
-    r3 = (S+Sqrt[S^2-4P])/2;
-    r4 = (S-Sqrt[S^2-4P])/2;
-    kr = (r3-r4)/(r2-r4);
-    k\[Theta] = (1-EnSquared)a^2/Q;
-    factor1 = Sqrt[(2p)(r2-r4)2a^2/(2p^2P)];
-    r\[Theta]Ratio = factor1 EllipticK[k\[Theta]]/EllipticK[kr];
-    
-    rPlus = 1+Sqrt[1-a^2];
-    rMinus = 1-Sqrt[1-a^2];
-    hPlus = (r3-rPlus)/(r2-rPlus);
-    hMinus = (r3-rMinus)/(r2-rMinus);
-    factor2 = 2a/(Pi(rPlus-rMinus)Sqrt[2(r2-r4)])2Sqrt[EnSquared];
-    BrPlus = rPlus/(r3-rPlus)(EllipticK[kr]-(r2-r3)/(r2-rPlus)EllipticPi[hPlus, kr]);
-    BrMinus = rMinus/(r3-rMinus)(EllipticK[kr]-(r2-r3)/(r2-rMinus)EllipticPi[hPlus, kr]);
-    Br = factor2(BrPlus-BrMinus);
-    (* {prograde, retrograde} *)
-    {1/(1/r\[Theta]Ratio+Br),-1/(-1/r\[Theta]Ratio+Br)}
-];
+kr[a_,p_,e_,x_]:=(p-p (1-e)/(1+e))/(p-r3[a,p,e,x](1-e))(r3[a,p,e,x]-r4[a,p,e,x])/(p/(1+e)-r4[a,p,e,x])
+k\[Theta][a_,p_,e_,x_]:=(1-x^2)(1-e^2)a^4/(p^2 \[Pi]xReduced[a,p,e,x]);
+rPlus[a_]:=1+Sqrt[1-a^2];
+rMinus[a_]:=1-Sqrt[1-a^2];
+hPlus[a_,p_,e_,x_]:=(p-p (1-e)/(1+e))/(p-r3[a,p,e,x](1-e))(r3[a,p,e,x]-rPlus[a])/(p/(1+e)-rPlus[a]);
+hMinus[a_,p_,e_,x_]:=(p-p (1-e)/(1+e))/(p-r3[a,p,e,x](1-e))(r3[a,p,e,x]-rMinus[a])/(p/(1+e)-rMinus[a]);
+prefactor\[Theta][a_,p_,e_,x_]:=2/Pi Sqrt[((a^2(-1+e^2)+p^2)(a^2-\[Pi]x[a,p,e,x])+2 a^2 p \[Pi]p[a,p,e,x])/(p^2 \[Pi]xReduced[a,p,e,x])];
+prefactorR[a_,p_,e_,x_]:=2a/(Pi(rPlus[a]-rMinus[a])) Sqrt[(2p+(1-e^2)\[Pi]p[a,p,e,x])/(2(p-r3[a,p,e,x](1-e))(p-r4[a,p,e,x](1+e)))];
+termRPlus[a_,p_,e_,x_]:=(2Sqrt[En2[a,p,e,x]] rPlus[a]-a Sign[x] Sqrt[L2[a,p,e,x]])/(r3[a,p,e,x]-rPlus[a])(EllipticK[kr[a,p,e,x]]-(p/(1+e)-r3[a,p,e,x])/(p/(1+e)-rPlus[a])EllipticPi[hPlus[a,p,e,x], kr[a,p,e,x]]);
+termRMinus[a_,p_,e_,x_]:=(2Sqrt[En2[a,p,e,x]] rMinus[a]-a Sign[x] Sqrt[L2[a,p,e,x]])/(r3[a,p,e,x]-rMinus[a])(EllipticK[kr[a,p,e,x]]-(p/(1+e)-r3[a,p,e,x])/(p/(1+e)-rMinus[a])EllipticPi[hMinus[a,p,e,x], kr[a,p,e,x]]);
 
 
-(* ::Subsubsection:: *)
+term\[Theta][a_,p_,e_,x_]:=prefactor\[Theta][a,p,e,x] EllipticPi[1-x^2, k\[Theta][a,p,e,x]];
+termR[a_,p_,e_,x_]:=prefactorR[a,p,e,x](termRPlus[a,p,e,x]-termRMinus[a,p,e,x]);
+
+
+r\[Phi]Ratio[a_, p_, e_, x_/;x!=0]:=Sign[x]/(Sign[x] term\[Theta][a,p,e,x]/r\[Theta]Ratio[a,p,e,x]+termR[a,p,e,x]);
+r\[Phi]Ratio[a_, p_, e_, x_/;x==0]:={1/(1/r\[Theta]Ratio[a,p,e,x]+termR[a,p,e,x]),-1/(-1/r\[Theta]Ratio[a,p,e,x]+termR[a,p,e,x])};
+
+
+(* ::Subsubsection::Closed:: *)
 (*Given (a,e,x) and Subscript[\[CapitalOmega], r]/Subscript[\[CapitalOmega], \[Phi]]= Subscript[\[Beta], r]/Subscript[\[Beta], \[Phi]] find p*)
 
 
@@ -676,7 +687,7 @@ Options[KerrGeoOrbitRPhiResonantP]={PrecisionGoal->Automatic};
 
 
 KerrGeoOrbitRPhiResonantP[a_?NumericQ, e_?NumericQ, x_?NumericQ, {\[Beta]r_Integer, \[Beta]\[Phi]_Integer}, opts:OptionsPattern[]]:=
-Module[{pg,ratio,argpg,resonantEqn,pStar,pp,pgTest},
+Module[{pg,ratio,argpg,resonantEqn,pStar,pp,pgTest, pSep},
 	(*See if the user specified some precision goal *)
 	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidXQ[x]||Not@ValidResIntQ[\[Beta]r,0,\[Beta]\[Phi]],Abort[]];
 	
@@ -686,6 +697,7 @@ Module[{pg,ratio,argpg,resonantEqn,pStar,pp,pgTest},
 	If[x<0&&ratio>0, Message[KerrGeoFindResonance::invalidRetrograde]; Abort[]];
 	(* pStar provides an initial guess for p. Note that p = pStar for e = 0 and a = 0*)
 	pStar=6/(1-ratio^2);
+	pSep=KerrGeoSeparatrix[a,e,x];
 	
 	(* Resonant condition defined by the equation below *)
 	If[x==0,
@@ -705,9 +717,9 @@ Module[{pg,ratio,argpg,resonantEqn,pStar,pp,pgTest},
 	If[pg==Infinity,pg=$MachinePrecision];
 	
 	If[pg==$MachinePrecision,
-		Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar}]],
-		Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar},PrecisionGoal->pg,WorkingPrecision->pg]],
-		Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar},PrecisionGoal->pg,WorkingPrecision->pg]]
+		ResonanceSolver[resonantEqn,{pp, pStar, pSep}],
+		ResonanceSolver[resonantEqn,{pp, pStar, pSep, PrecisionGoal->pg, WorkingPrecision->pg}],
+		ResonanceSolver[resonantEqn,{pp, pStar, pSep, PrecisionGoal->pg, WorkingPrecision->pg}]
 	]
 ];
 
@@ -814,11 +826,11 @@ Module[{pg,rtt,argpg,resonantEqn,x0Test, x1Test, x0Test1,x0Test2,x1Test1,x1Test2
 ];
 
 
-(* ::Subsection:: *)
+(* ::Subsection::Closed:: *)
 (*\[Phi]\[Theta]-resonance*)
 
 
-(* ::Subsubsection:: *)
+(* ::Subsubsection::Closed:: *)
 (*Testing functions*)
 
 
@@ -830,66 +842,8 @@ Module[{pg,rtt,argpg,resonantEqn,x0Test, x1Test, x0Test1,x0Test2,x1Test1,x1Test2
 (*Useful functions for root-finding*)
 
 
-\[Phi]\[Theta]Ratio[a_, p_, e_, x_/;x!=0]:=Sign[x] ("\!\(\*SubscriptBox[\(\[CapitalUpsilon]\), \(\[Phi]\)]\)")/("\!\(\*SubscriptBox[\(\[CapitalUpsilon]\), \(\[Theta]\)]\)")/.KerrGeoFrequencies[a, p, e, x, Time->"Mino"]
-
-
-\[Phi]\[Theta]Ratio[a_, p_, e_/;e!=1, x_/;x==0]:=
-Module[{S, P, r1, r2, r3, r4, EnSquared, Q, kr, k\[Theta], factor1, factor2, rPlus, rMinus, hPlus, hMinus, hr, BrPlus, BrMinus, Br, r\[Theta]Ratio},
-	(* S=r3+r4, P=r3*r4 *)
-	P = (a^2(a^4(-1+e^2)2+p^4+2a^2p(-2+p+e^2(2+p))))/(a^4(-1+e^2)^2+2a^2(1+e^2)p^2+(-4+p)p^3);
-	S = (2(a^2(-1+e^2)+p^2)^2)/(a^4(-1+e^2)^2+2a^2(1+e^2)p^2+(-4+p)p^3);
-	EnSquared = 1+2(-1+e^2)/(2p+S-e^2S);
-    Q = 2p^2P/(a^2(2p+S-e^2S));
-    r1 = p/(1-e);
-    r2 = p/(1+e);
-    r3 = (S+Sqrt[S^2-4P])/2;
-    r4 = (S-Sqrt[S^2-4P])/2;
-    kr = (r1-r2)/(r1-r3)(r3-r4)/(r2-r4);
-    k\[Theta] = (1-EnSquared)a^2/Q;
-    factor1 = Sqrt[(r1-r3)(r2-r4)2(1-e^2)a^2/(2p^2P)];
-    r\[Theta]Ratio = factor1 EllipticK[k\[Theta]]/EllipticK[kr];
-    
-    rPlus = 1+Sqrt[1-a^2];
-    rMinus = 1-Sqrt[1-a^2];
-    hr = (r1-r2)/(r1-r3);
-    hPlus = hr (r3-rPlus)/(r2-rPlus);
-    hMinus = hr (r3-rMinus)/(r2-rMinus);
-    factor2 = 2a/(Pi(rPlus-rMinus)Sqrt[(1-EnSquared)(r1-r3)(r2-r4)])2Sqrt[EnSquared];
-    BrPlus = rPlus/(r3-rPlus)(EllipticK[kr]-(r2-r3)/(r2-rPlus)EllipticPi[hPlus, kr]);
-    BrMinus = rMinus/(r3-rMinus)(EllipticK[kr]-(r2-r3)/(r2-rMinus)EllipticPi[hPlus, kr]);
-    Br = factor2(BrPlus-BrMinus);
-    (* {prograde, retrograde} *)
-    {1+Br r\[Theta]Ratio, 1-Br r\[Theta]Ratio}
-];
-
-
-\[Phi]\[Theta]Ratio[a_, p_, e_/;e==1, x_/;x==0]:=
-Module[{S, P, r1, r2, r3, r4, EnSquared, Q, kr, k\[Theta], factor1, factor2, rPlus, rMinus, hPlus, hMinus, hr, BrPlus, BrMinus, Br, r\[Theta]Ratio},
-	(* S=r3+r4, P=r3*r4 *)
-	P = (a^2 (4 a^2 p^2+p^4))/(4 a^2 p^2+(-4+p) p^3);
-	S = (2 p^4)/(4 a^2 p^2 + (-4 + p) p^3);
-	EnSquared = 1;
-    Q = 2p^2P/(a^2 2p);
-    (* r1=p/(1-e) diverges *)
-    r2 = p/2;
-    r3 = (S+Sqrt[S^2-4P])/2;
-    r4 = (S-Sqrt[S^2-4P])/2;
-    kr = (r3-r4)/(r2-r4);
-    k\[Theta] = (1-EnSquared)a^2/Q;
-    factor1 = Sqrt[(2p)(r2-r4)2a^2/(2p^2P)];
-    r\[Theta]Ratio = factor1 EllipticK[k\[Theta]]/EllipticK[kr];
-    
-    rPlus = 1+Sqrt[1-a^2];
-    rMinus = 1-Sqrt[1-a^2];
-    hPlus = (r3-rPlus)/(r2-rPlus);
-    hMinus = (r3-rMinus)/(r2-rMinus);
-    factor2 = 2a/(Pi(rPlus-rMinus)Sqrt[2(r2-r4)])2Sqrt[EnSquared];
-    BrPlus = rPlus/(r3-rPlus)(EllipticK[kr]-(r2-r3)/(r2-rPlus)EllipticPi[hPlus, kr]);
-    BrMinus = rMinus/(r3-rMinus)(EllipticK[kr]-(r2-r3)/(r2-rMinus)EllipticPi[hPlus, kr]);
-    Br = factor2(BrPlus-BrMinus);
-    (* {prograde, retrograde} *)
-    {1+Br r\[Theta]Ratio, 1-Br r\[Theta]Ratio}
-];
+\[Phi]\[Theta]Ratio[a_, p_, e_, x_/;x!=0]:=term\[Theta][a,p,e,x]+Sign[x]r\[Theta]Ratio[a,p,e,x]termR[a,p,e,x];
+\[Phi]\[Theta]Ratio[a_, p_, e_, x_/;x==0]:={1+r\[Theta]Ratio[a,p,e,x]termR[a,p,e,x],1-r\[Theta]Ratio[a,p,e,x]termR[a,p,e,x]};
 
 
 (* ::Subsubsection::Closed:: *)
@@ -900,7 +854,7 @@ Options[KerrGeoOrbitPhiThetaResonantP]={PrecisionGoal->Automatic};
 
 
 KerrGeoOrbitPhiThetaResonantP[a_?NumericQ, e_?NumericQ, x_?NumericQ, {\[Beta]\[Theta]_Integer, \[Beta]\[Phi]_Integer}, opts:OptionsPattern[]]:=
-Module[{pg,ratio,argpg,resonantEqn,pStar,pp,pgTest},
+Module[{pg,ratio,argpg,resonantEqn,pStar,pp,pgTest,pSep},
 	(*See if the user specified some precision goal *)
 	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidXQ[x]||Not@ValidResIntQ[0,\[Beta]\[Theta],\[Beta]\[Phi]],Abort[]];
 	
@@ -910,7 +864,7 @@ Module[{pg,ratio,argpg,resonantEqn,pStar,pp,pgTest},
 	If[x<0&&ratio>1, Message[KerrGeoFindResonance::invalidRetrograde]; Abort[]];
 	(* pStar provides an initial guess for p. Note that p = pStar for e = 0*)
 	pStar=(2 a/Abs[ratio-1])^(2/3);
-
+	pSep=KerrGeoSeparatrix[a,e,x];
 	(* Resonant condition defined by the equation below *)
 	If[x==0,
 		If[ratio>1,
@@ -929,9 +883,9 @@ Module[{pg,ratio,argpg,resonantEqn,pStar,pp,pgTest},
 	If[pg==Infinity,pg=$MachinePrecision];
 	
 	If[pg==$MachinePrecision,
-		Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar}]],
-		Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar},PrecisionGoal->pg,WorkingPrecision->pg]],
-		Re[pp/.FindRoot[resonantEqn[pp],{pp,pStar},PrecisionGoal->pg,WorkingPrecision->pg]]
+		ResonanceSolver[resonantEqn,{pp, pStar, pSep}],
+		ResonanceSolver[resonantEqn,{pp, pStar, pSep, PrecisionGoal->pg, WorkingPrecision->pg}],
+		ResonanceSolver[resonantEqn,{pp, pStar, pSep, PrecisionGoal->pg, WorkingPrecision->pg}]
 	]
 ];
 
@@ -1057,10 +1011,10 @@ Module[{pg,argpg,resonantEqn,x0Test, x1Test,xGuess,xx,ratio},
 (*Given (a,e,\[Beta]r,\[Beta]\[Theta]) find (\[Beta]rmin, \[Beta]rmax)*)
 
 
-Options[KerrGeoOrbitTripleResonant\[Beta]r]={PrecisionGoal->Automatic};
+Options[KerrGeoOrbitTripleResonantPX\[Beta]r]={PrecisionGoal->Automatic};
 
 
-KerrGeoOrbitTripleResonant\[Beta]r[a_?NumericQ, e_?NumericQ, {\[Beta]\[Theta]_Integer, \[Beta]\[Phi]_Integer}, opts:OptionsPattern[]]:=
+KerrGeoOrbitTripleResonantPX\[Beta]r[a_?NumericQ, e_?NumericQ, {\[Beta]\[Theta]_Integer, \[Beta]\[Phi]_Integer}, opts:OptionsPattern[]]:=
 Module[{pg,argpg,resonantEqnr\[Theta],resonantEqnr\[Phi],p0Test,p1Test,r\[Theta]ratio0,r\[Theta]ratio1,\[Phi]\[Theta]ratio},
 	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidXQ[x]||Not@ValidResIntQ[0,\[Beta]\[Theta],\[Beta]\[Phi]],Abort[]];
 	\[Phi]\[Theta]ratio=\[Beta]\[Phi]/\[Beta]\[Theta];
@@ -1076,10 +1030,10 @@ Module[{pg,argpg,resonantEqnr\[Theta],resonantEqnr\[Phi],p0Test,p1Test,r\[Theta]
 (*Given (a,e,\[Beta]r,\[Beta]\[Phi]) find (\[Beta]\[Theta]min, \[Beta]\[Theta]max)*)
 
 
-Options[KerrGeoOrbitTripleResonant\[Beta]\[Theta]]={PrecisionGoal->Automatic};
+Options[KerrGeoOrbitTripleResonantPX\[Beta]\[Theta]]={PrecisionGoal->Automatic};
 
 
-KerrGeoOrbitTripleResonant\[Beta]\[Theta][a_?NumericQ, e_?NumericQ, {\[Beta]r_Integer, \[Beta]\[Phi]_Integer}, opts:OptionsPattern[]]:=
+KerrGeoOrbitTripleResonantPX\[Beta]\[Theta][a_?NumericQ, e_?NumericQ, {\[Beta]r_Integer, \[Beta]\[Phi]_Integer}, opts:OptionsPattern[]]:=
 Module[{pg,argpg,resonantEqnr\[Theta],resonantEqnr\[Phi],p0Test,p1Test,r\[Theta]ratio0,r\[Theta]ratio1,r\[Phi]ratio},
 	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidXQ[x]||Not@ValidResIntQ[\[Beta]r,0,\[Beta]\[Phi]],Abort[]];
 	r\[Phi]ratio=\[Beta]r/\[Beta]\[Phi];
@@ -1095,10 +1049,10 @@ Module[{pg,argpg,resonantEqnr\[Theta],resonantEqnr\[Phi],p0Test,p1Test,r\[Theta]
 (*Given (a,e,\[Beta]r,\[Beta]\[Theta]) find (\[Beta]\[Phi]min, \[Beta]\[Phi]max)*)
 
 
-Options[KerrGeoOrbitTripleResonant\[Beta]\[Phi]]={PrecisionGoal->Automatic};
+Options[KerrGeoOrbitTripleResonantPX\[Beta]\[Phi]]={PrecisionGoal->Automatic};
 
 
-KerrGeoOrbitTripleResonant\[Beta]\[Phi][a_?NumericQ, e_?NumericQ, {\[Beta]r_Integer, \[Beta]\[Theta]_Integer}, opts:OptionsPattern[]]:=
+KerrGeoOrbitTripleResonantPX\[Beta]\[Phi][a_?NumericQ, e_?NumericQ, {\[Beta]r_Integer, \[Beta]\[Theta]_Integer}, opts:OptionsPattern[]]:=
 Module[{pg,argpg,resonantEqnr\[Theta],resonantEqnr\[Phi],p0Test,p1Test,r\[Phi]ratio0,r\[Phi]ratio1,r\[Theta]ratio},
 	If[Not@ValidAQ[a]||Not@ValidEQ[e]||Not@ValidXQ[x]||Not@ValidResIntQ[\[Beta]r,\[Beta]\[Theta],0],Abort[]];
 	r\[Theta]ratio=\[Beta]r/\[Beta]\[Theta];
@@ -1131,9 +1085,9 @@ Module[{pg,argpg,resonantEqnr\[Theta],resonantEqnr\[Phi],pGuess,xGuess,pp,xx,r\[
 	p1r\[Phi]Test=KerrGeoOrbitRPhiResonantP[a, e, Sign[r\[Phi]ratio], {\[Beta]r, \[Beta]\[Phi]},opts];
 	checkSolution=(p0r\[Theta]Test-p0r\[Phi]Test)(p1r\[Theta]Test-p1r\[Phi]Test);
 	If[checkSolution>0,
-		rInts=KerrGeoOrbitTripleResonant\[Beta]r[a, e, {\[Beta]\[Theta], \[Beta]\[Phi]}, opts];
-		\[Theta]Ints=KerrGeoOrbitTripleResonant\[Beta]\[Theta][a, e, {\[Beta]r, \[Beta]\[Phi]}, opts];
-		\[Phi]Ints=KerrGeoOrbitTripleResonant\[Beta]\[Phi][a, e, {\[Beta]r, \[Beta]\[Theta]}, opts];
+		rInts=KerrGeoOrbitTripleResonantPX\[Beta]r[a, e, {\[Beta]\[Theta], \[Beta]\[Phi]}, opts];
+		\[Theta]Ints=KerrGeoOrbitTripleResonantPX\[Beta]\[Theta][a, e, {\[Beta]r, \[Beta]\[Phi]}, opts];
+		\[Phi]Ints=KerrGeoOrbitTripleResonantPX\[Beta]\[Phi][a, e, {\[Beta]r, \[Beta]\[Theta]}, opts];
 		Message[KerrGeoFindResonance::noTripleResonance,rInts[[1]],rInts[[2]],\[Theta]Ints[[1]],\[Theta]Ints[[2]],\[Phi]Ints[[1]],\[Phi]Ints[[2]]];
 		Abort[]];
 	
