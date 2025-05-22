@@ -366,7 +366,7 @@ Return[pSep+10^(-5)];
 ];
 
 
-(* ::Subsection::Closed:: *)
+(* ::Subsection:: *)
 (*r\[Theta]-resonances*)
 
 
@@ -417,7 +417,7 @@ ValidResIntQ[0,\[Beta]\[Theta]_/;\[Beta]\[Theta]!=0,\[Beta]\[Phi]_/;\[Beta]\[Phi
 ];
 
 
-(* ::Subsubsection::Closed:: *)
+(* ::Subsubsection:: *)
 (*Useful functions for root-finding*)
 
 
@@ -525,7 +525,7 @@ Module[{pg,ratio,argpg,resonantEqn,pStar,pp,pgTest,pSep},
 ];
 
 
-(* ::Subsubsection::Closed:: *)
+(* ::Subsubsection:: *)
 (*Given (a,p,x) and Subscript[\[CapitalOmega], r]/Subscript[\[CapitalOmega], \[Theta]]= Subscript[\[Beta], r]/Subscript[\[Beta], \[Theta]] find e*)
 
 
@@ -569,7 +569,7 @@ Module[{pg,argpg,resonantEqn,e0Test,e1Test,eGuess,ee,ratio},
 ];
 
 
-(* ::Subsubsection::Closed:: *)
+(* ::Subsubsection:: *)
 (*Given (a,p,e) and Subscript[\[CapitalOmega], r]/Subscript[\[CapitalOmega], \[Theta]]= Subscript[\[Beta], r]/Subscript[\[Beta], \[Theta]] find x*)
 
 
@@ -613,7 +613,7 @@ Module[{pg,argpg,resonantEqn,x0Test,x1Test,xGuess,xx,xxx,ratio},
 ];
 
 
-(* ::Subsection::Closed:: *)
+(* ::Subsection:: *)
 (*r\[Phi]-resonances*)
 
 
@@ -724,7 +724,7 @@ Module[{pg,ratio,argpg,resonantEqn,pStar,pp,pgTest, pSep},
 ];
 
 
-(* ::Subsubsection::Closed:: *)
+(* ::Subsubsection:: *)
 (*Given (a,p,x) and Subscript[\[CapitalOmega], r]/Subscript[\[CapitalOmega], \[Phi]]= Subscript[\[Beta], r]/Subscript[\[Beta], \[Phi]] find e*)
 
 
@@ -775,7 +775,7 @@ Module[{pg,argpg,resonantEqn,e0Test,e1Test,eGuess,ee,ratio},
 ];
 
 
-(* ::Subsubsection::Closed:: *)
+(* ::Subsubsection:: *)
 (*Given (a,p,e) and Subscript[\[CapitalOmega], r]/Subscript[\[CapitalOmega], \[Phi]]= Subscript[\[Beta], r]/Subscript[\[Beta], \[Phi]] find x*)
 
 
@@ -826,7 +826,7 @@ Module[{pg,rtt,argpg,resonantEqn,x0Test, x1Test, x0Test1,x0Test2,x1Test1,x1Test2
 ];
 
 
-(* ::Subsection::Closed:: *)
+(* ::Subsection:: *)
 (*\[Phi]\[Theta]-resonance*)
 
 
@@ -890,7 +890,7 @@ Module[{pg,ratio,argpg,resonantEqn,pStar,pp,pgTest,pSep},
 ];
 
 
-(* ::Subsubsection::Closed:: *)
+(* ::Subsubsection:: *)
 (*Given (a,p,x) and Subscript[\[CapitalOmega], \[Phi]]/Subscript[\[CapitalOmega], \[Theta]]= Subscript[\[Beta], \[Phi]]/Subscript[\[Beta], \[Theta]] find e*)
 
 
@@ -941,7 +941,7 @@ Module[{pg,argpg,resonantEqn,e0Test,e1Test,eGuess,ee,ratio},
 ];
 
 
-(* ::Subsubsection::Closed:: *)
+(* ::Subsubsection:: *)
 (*Given (a,p,e) and Subscript[\[CapitalOmega], \[Theta]]/Subscript[\[CapitalOmega], \[Phi]]= Subscript[\[Beta], \[Theta]]/Subscript[\[Beta], \[Phi]] find x*)
 
 
@@ -960,13 +960,13 @@ Module[{pg,argpg,resonantEqn,x0Test, x1Test,xGuess,xx,ratio},
 	(* Test to see if there is an inclination angle that will lead to a bound orbital resonance 
 	 based on the provided values of a, p, e *)
 	x0Test=KerrGeoOrbitPhiThetaResonantP[a,e,0,{\[Beta]\[Theta],\[Beta]\[Phi]},opts];
-	x1Test=KerrGeoOrbitPhiThetaResonantP[a,e,Sign[ratio],{\[Beta]\[Theta],\[Beta]\[Phi]},opts];
+	x1Test=KerrGeoOrbitPhiThetaResonantP[a,e,Sign[ratio-1],{\[Beta]\[Theta],\[Beta]\[Phi]},opts];
 	
 	If[ratio>1 && (p<x1Test||x0Test<p), Message[KerrGeoFindResonance::noresonance, x1Test, x0Test]; Abort[];];
 	If[ratio<1 && (p<x0Test||x1Test<p), Message[KerrGeoFindResonance::noresonance, x0Test, x1Test]; Abort[];];
 	If[p==x0Test,Return[0]];
 	If[p==x1Test,Return[Sign[ratio]]];
-	xGuess=Sign[ratio](p-x0Test)/(x1Test-x0Test);
+	xGuess=Sign[ratio-1](p-x0Test)/(x1Test-x0Test);
 
 	(* Resonant condition defined by the equation below *)
 	resonantEqn[x_?NumericQ]:=\[Phi]\[Theta]Ratio[a, p, e, x]-Abs[ratio];
@@ -987,7 +987,7 @@ Module[{pg,argpg,resonantEqn,x0Test, x1Test,xGuess,xx,ratio},
 ];
 
 
-(* ::Subsection::Closed:: *)
+(* ::Subsection:: *)
 (*r\[Theta]\[Phi]-resonance*)
 
 
@@ -1007,7 +1007,7 @@ Module[{pg,argpg,resonantEqn,x0Test, x1Test,xGuess,xx,ratio},
 (*Use those of double resonances*)
 
 
-(* ::Subsubsection:: *)
+(* ::Subsubsection::Closed:: *)
 (*Given (a,e,\[Beta]r,\[Beta]\[Theta]) find (\[Beta]rmin, \[Beta]rmax)*)
 
 
